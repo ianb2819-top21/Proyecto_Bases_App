@@ -41,7 +41,7 @@
                 
                 <!-- Vista para ESTUDIANTES y DOCENTES -->
                 {% if session.get('rol') in ['estudiante', 'docente'] %}
-                    {% if libro.estado == 'disponible' %}
+                    {% if libro.estado | lower == 'disponible' %}
                         <button class="btn-solicitar">Solicitar Préstamo</button>
                     {% else %}
                         <button class="btn-deshabilitado" disabled>No disponible</button>
