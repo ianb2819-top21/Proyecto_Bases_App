@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BiblioUninorte - Sistema de Gestión</title>
+    
+    <!-- 1. CONEXIÓN AL CSS USANDO FLASK -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Fuente moderna Inter desde Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- 2. BARRA SIMULADORA DE ROLES (Para tus pruebas y la sustentación) -->
+    <div class="simulador-roles">
+        <span>🛠️ <strong>Simulador de Vista:</strong> Estás viendo la app como <strong class="rol-actual">{{ session.get('rol', 'estudiante') | upper }}</strong></span>
+        <div class="botones-rol">
+            <a href="{{ url_for('cambiar_rol', nuevo_rol='estudiante') }}" class="{% if session.get('rol') == 'estudiante' %}activo{% endif %}">👨‍🎓 Estudiante</a>
+            <a href="{{ url_for('cambiar_rol', nuevo_rol='docente') }}" class="{% if session.get('rol') == 'docente' %}activo{% endif %}">👨‍🏫 Docente</a>
+            <a href="{{ url_for('cambiar_rol', nuevo_rol='bibliotecario') }}" class="{% if session.get('rol') == 'bibliotecario' %}activo{% endif %}">📖 Bibliotecario</a>
+            <a href="{{ url_for('cambiar_rol', nuevo_rol='administrador') }}" class="{% if session.get('rol') == 'administrador' %}activo{% endif %}">⚙️ Admin (BD)</a>
+        </div>
+    </div>
+
+    <!-- 3. BARRA DE NAVEGACIÓN PRINCIPAL (Cambia según el rol) -->
+    <header class="navbar">
+        <div class="logo">📚 BiblioUninorte</div>
+        
+        <nav class="menu-navegacion">
+            <!-- TODOS los usuarios ven el catálogo -->
+            <a href="{{ url_for('catalogo') }}">Catálogo de Libros</a>
+
+            <!-- ESTUDIANTES y DOCENTES ven sus propios préstamos -->
+            {% if session.get('rol') in ['estudiante', 'docente'] %}
+                <a href="#">Mis Préstamos</a>
+            {% endif %}
+
+            <!-- BIBLIOTECARIO y ADMIN ven la gestión de préstamos y reportes -->
+            {% if session.get('rol') in ['bibliotecario', 'administrador'] %}
+                <a href="#" class="nav-especial">Aprobar / Devolver</a>
+                <a href="#" class="nav-especial">Reportes e Inventario</a>
+            {% endif %}
+
+            <!-- SOLO EL ADMINISTRADOR puede gestionar usuarios y CRUD completo de la BD -->
+            {% if session.get('rol') == 'administrador' %}
+                <a href="#" class="nav-admin">Gestión BD (Usuarios/Libros)</a>
+            {% endif %}
+        </nav>
+
+        <div class="perfil-usuario">
+            <span class="nombre-usuario">👤 {{ session.get('nombre', 'Invitado') }}</span>
+            <a href="#" class="btn-login">Cambiar Usuario</a>
+        </div>
+    </header>
+
+    <!-- 4. EL "HUECO" DONDE SE INYECTARÁN LAS DEMÁS PANTALLAS -->
+    <main class="container">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+</body>
+</html>
