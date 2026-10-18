@@ -1,0 +1,264 @@
+/* 1. RESETEO GENERAL Y TEMA OSCURO */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: #0f172a; /* Fondo azul noche moderno */
+    color: #f8fafc;            /* Texto blanco suave */
+}
+
+/* 2. BARRA SIMULADORA DE ROLES (Arriba del todo) */
+.simulador-roles {
+    background-color: #020617;
+    padding: 0.6rem 3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #1e293b;
+}
+
+.rol-actual {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.15);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.botones-rol a {
+    color: #94a3b8;
+    text-decoration: none;
+    padding: 0.3rem 0.7rem;
+    margin-left: 0.4rem;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    transition: all 0.2s;
+}
+
+.botones-rol a:hover {
+    color: #f8fafc;
+    border-color: #64748b;
+}
+
+.botones-rol a.activo {
+    background-color: #38bdf8;
+    color: #020617;
+    font-weight: 700;
+    border-color: #38bdf8;
+}
+
+/* 3. BARRA DE NAVEGACIÓN PRINCIPAL */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 3rem;
+    background-color: #1e293b;
+    border-bottom: 1px solid #334155;
+}
+
+.logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #38bdf8;
+}
+
+.menu-navegacion a {
+    color: #cbd5e1;
+    text-decoration: none;
+    margin: 0 1rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: color 0.2s;
+}
+
+.menu-navegacion a:hover {
+    color: #38bdf8;
+}
+
+/* Colores distintivos para enlaces de Bibliotecario y Admin */
+.nav-especial {
+    color: #fbbf24 !important; /* Dorado para bibliotecario */
+}
+
+.nav-admin {
+    color: #c084fc !important; /* Morado para Administrador BD */
+}
+
+.perfil-usuario {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.nombre-usuario {
+    font-size: 0.9rem;
+    color: #94a3b8;
+}
+
+.btn-login {
+    background: #2563eb;
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* 4. CONTENEDOR PRINCIPAL Y ENCABEZADO */
+.container {
+    max-width: 1200px;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem;
+}
+
+.hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+}
+
+.hero h1 {
+    font-size: 2rem;
+    margin-bottom: 0.4rem;
+}
+
+.hero p {
+    color: #94a3b8;
+}
+
+.btn-agregar-libro {
+    background: #9333ea;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* 5. CUADRÍCULA Y TARJETAS DE LIBROS */
+.grid-libros {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.card-libro {
+    background: #1e293b;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #334155;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card-libro:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+.portada-contenedor {
+    position: relative;
+    height: 330px;
+    background: #020617;
+}
+
+.portada-contenedor img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Etiquetas de Disponible / Prestado */
+.badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.badge.disponible {
+    background: #16a34a;
+    color: white;
+}
+
+.badge.prestado {
+    background: #dc2626;
+    color: white;
+}
+
+.card-info {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.categoria {
+    font-size: 0.75rem;
+    color: #38bdf8;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+}
+
+.titulo {
+    font-size: 1.15rem;
+    margin-bottom: 0.3rem;
+}
+
+.autor {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+}
+
+.isbn {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 1.2rem;
+}
+
+/* 6. BOTONES DE ACCIÓN SEGÚN EL ROL */
+.acciones-card {
+    margin-top: auto;
+}
+
+.acciones-card button {
+    width: 100%;
+    padding: 0.7rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.acciones-card button:hover {
+    opacity: 0.9;
+}
+
+.btn-solicitar { background: #0284c7; color: white; }
+.btn-deshabilitado { background: #334155; color: #64748b; cursor: not-allowed !important; }
+.btn-devolver { background: #eab308; color: #020617; }
+.btn-aprobar { background: #16a34a; color: white; }
+
+.botones-admin-card {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-editar { background: #475569; color: white; }
+.btn-eliminar { background: #dc2626; color: white; }
