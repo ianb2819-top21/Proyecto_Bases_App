@@ -16,7 +16,9 @@ def catalogo():
         # Traemos los libros reales (Clean Code, Effective Java, etc.)
         libros_reales = connection.obtener_catalogo_web()
     except Exception as e:
-        print("Error conectando a BD:", e)
+        import traceback
+        print(f"Error conectando a BD: {e}")
+        traceback.print_exc()
         libros_reales = [] # Si hay error, enviamos lista vacía para no romper la web
 
     return render_template('catalogo.html', libros=libros_reales)

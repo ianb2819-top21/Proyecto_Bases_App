@@ -61,6 +61,9 @@ class MySQLDB(BaseDatos):
         import pymysql
         from pymysql.cursors import DictCursor
         
+        if isinstance(url, bytes):
+            url = url.decode("utf-8")
+
         u = urlparse(url)
         nombre_bd = u.path.lstrip("/")
     
@@ -125,6 +128,23 @@ class MySQLDB(BaseDatos):
         self.conn.close()
         
 def crear_db(url=None):
-    load_dotenv()
-    url = url or os.getenv("DATABASE_URL")
-    return MySQLDB(url)
+    import traceback
+
+    try:
+        load_dotenv()
+        url = url or os.getenv("DATABASE_URL")
+
+        if not url:
+            raise ValueError("No se encontró DATABASE_URL en el archivo .env")
+
+        print("Intentando conectar con MySQL...")
+
+        db = MySQLDB(url)
+
+        print("Conexión con MySQL exitosa")
+        return db
+
+    except Exception as e:
+        print(f"ERROR AL CONECTAR CON MYSQL: {e}")
+        traceback.print_exc()
+        raise
