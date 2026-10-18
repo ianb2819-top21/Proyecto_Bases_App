@@ -448,6 +448,20 @@ def obtener_usuarios_por_fecha_registro(fecha_inicio, fecha_fin):
             (fecha_inicio, fecha_fin)
         )
 
-
+def obtener_catalogo_web():
+    from db import crear_db # Aseguramos la importación
+    with crear_db() as db:
+        # Usamos JOIN para unir la información del libro con la disponibilidad de su ejemplar
+        return db.consultar("""
+            SELECT 
+                l.isbn, 
+                l.titulo, 
+                'Ingeniería / Tecnología' AS categoria, 
+                e.estado,
+                CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen
+            FROM libros l
+            JOIN ejemplares e ON l.isbn = e.isbn
+            GROUP BY l.isbn, e.estado
+        """)
         
         
