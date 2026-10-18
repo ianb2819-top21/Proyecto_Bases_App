@@ -59,18 +59,50 @@ class BaseDatos(ABC):
 class MySQLDB(BaseDatos):
     def __init__(self, url):
         import pymysql
+        from pymysql.cursors import DictCursor
+        
         u = urlparse(url)
+        nombre_bd = u.path.lstrip("/")
+    
+        # 1. CONEXIÓN TEMPORAL: Solo para ver si la BD existe y crearla
+        conn_temp = pymysql.connect(
+            host=u.hostname,
+            port=u.port or 3306,
+            user=u.username,
+            password=u.password,
+            charset="utf8mb4",
+            autocommit=True,
+        )
+        try:
+            with conn_temp.cursor() as cur:
+                cur.execute("SHOW DATABASES LIKE %s", (nombre_bd,))
+                if not cur.fetchone():
+                    # Si no existe, ejecuta el archivo SQL
+                    try:
+                        script = SCHEMA_PATH.read_text(encoding="utf-8")
+                        for sentencia in _sentencias(script):
+                            cur.execute(sentencia)
+                    except Exception:
+                        cur.execute(f"DROP DATABASE IF EXISTS `{nombre_bd}`") 
+                        raise
+        finally:
+            conn_temp.close() # Cerramos el instalador
+            
+        # 2. CONEXIÓN PERMANENTE: Esta es la que usará tu aplicación viva
+        # CRÍTICO: Aquí usamos 'self.conn' y agregamos el 'DictCursor'
         self.conn = pymysql.connect(
             host=u.hostname,
             port=u.port or 3306,
             user=u.username,
             password=u.password,
-            database=u.path.lstrip("/"),
-            cursorclass=pymysql.cursors.DictCursor,
+            database=nombre_bd,      # Seleccionamos la base de datos
+            charset="utf8mb4",
+            cursorclass=DictCursor   # Obliga a MySQL a devolver diccionarios
         )
 
     def consultar(self, sql, params=()):
         with self.conn.cursor() as cur:
+            # Aquí funciona el traductor mágico de tu compañero
             cur.execute(sql.replace("?", "%s"), params)
             filas = list(cur.fetchall())
         self._confirmar()
