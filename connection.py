@@ -9,9 +9,7 @@ if __name__ == "__main__":
 '''
 
 
-def iniciar_tablas():
-    with crear_db() as db:
-        
+
     
     
 ''' 2.	Gestión de usuarios
