@@ -241,32 +241,18 @@ def obtener_prestamos_rechazados():
 '''Seguridad y autenticación
 La aplicación debe implementar un sistema de autenticación para los usuarios, asegurando que solo los usuarios registrados puedan acceder a las funcionalidades de la aplicación. Se debe utilizar un mecanismo de inicio de sesión con credenciales (usuario y contraseña) y, opcionalmente, se puede implementar autenticación basada en tokens para mayor seguridad.'''
 
-def autenticar_usuario(codigo, contrasena):
+def autenticar_usuario(codigo, correo):
     with crear_db() as db:
         usuario = db.consultar(
-            "SELECT * FROM usuarios WHERE codigo = ? AND contrasena = ?",
-            (codigo, contrasena)
+            # ¡Cambio vital: Ahora SQL busca la columna 'correo' real!
+            "SELECT * FROM usuarios WHERE codigo = ? AND correo = ?",
+            (codigo, correo)
         )
         if usuario:
-            return True  # Autenticación exitosa
+            return usuario[0]  # Retornamos el diccionario con los datos del usuario
         else:
-            return False  # Autenticación fallida
-        
-def cambiar_contrasena(codigo, contrasena_actual, nueva_contrasena):
-    with crear_db() as db:
-        usuario = db.consultar(
-            "SELECT * FROM usuarios WHERE codigo = ? AND contrasena = ?",
-            (codigo, contrasena_actual)
-        )
-        if usuario:
-            db.ejecutar(
-                "UPDATE usuarios SET contrasena = ? WHERE codigo = ?",
-                (nueva_contrasena, codigo)
-            )
-            return True  # Cambio de contraseña exitoso
-        else:
-            return False  # Contraseña actual incorrecta
-        
+            return None  # Autenticación fallida
+            
 def bloquear_usuario(codigo):
     with crear_db() as db:
         db.ejecutar(
@@ -314,36 +300,36 @@ def obtener_informacion_usuario(codigo):
         else:
             return None  # Usuario no encontrado
         
-def crear_usuario_administrador(codigo, identificacion, nombres, correo, contrasena):
+def crear_usuario_administrador(codigo, identificacion, nombres, correo, ):
     with crear_db() as db:
         db.ejecutar(
-            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, estado, contrasena) "
-            "VALUES (?, ?, ?, ?, 'administrador', 'activo', ?)",
-            (codigo, identificacion, nombres, correo, contrasena)
+            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, estado) "
+            "VALUES (?, ?, ?, ?, 'administrador', 'activo')",
+            (codigo, identificacion, nombres, correo)
         )
         
-def crear_usuario_bibliotecario(codigo, identificacion, nombres, correo, contrasena):
+def crear_usuario_bibliotecario(codigo, identificacion, nombres, correo):
     with crear_db() as db:
         db.ejecutar(
-            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, estado, contrasena) "
-            "VALUES (?, ?, ?, ?, 'bibliotecario', 'activo', ?)",
-            (codigo, identificacion, nombres, correo, contrasena)
+            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, estado) "
+            "VALUES (?, ?, ?, ?, 'bibliotecario', 'activo')",
+            (codigo, identificacion, nombres, correo)
         )
         
-def crear_usuario_estudiante(codigo, identificacion, nombres, correo, carrera, contrasena):
+def crear_usuario_estudiante(codigo, identificacion, nombres, correo, carrera):
     with crear_db() as db:
         db.ejecutar(
-            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, carrera, estado, contrasena) "
-            "VALUES (?, ?, ?, ?, 'estudiante', ?, 'activo', ?)",
-            (codigo, identificacion, nombres, correo, carrera, contrasena)
+            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, carrera, estado) "
+            "VALUES (?, ?, ?, ?, 'estudiante', ?, 'activo')",
+            (codigo, identificacion, nombres, correo, carrera)
         )
         
-def crear_usuario_docente(codigo, identificacion, nombres, correo, contrasena):
+def crear_usuario_docente(codigo, identificacion, nombres, correo):
     with crear_db() as db:
         db.ejecutar(
-            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, estado, contrasena) "
-            "VALUES (?, ?, ?, ?, 'docente', 'activo', ?)",
-            (codigo, identificacion, nombres, correo, contrasena)
+            "INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, estado) "
+            "VALUES (?, ?, ?, ?, 'docente', 'activo')",
+            (codigo, identificacion, nombres, correo)
         )
         
 def eliminar_usuario(codigo):
@@ -378,10 +364,6 @@ def actualizar_informacion_usuario(codigo, identificacion=None, nombres=None, co
         if carrera is not None:
             campos_actualizar.append("carrera = ?")
             valores.append(carrera)
-        if contrasena is not None:
-            campos_actualizar.append("contrasena = ?")
-            valores.append(contrasena)
-        
         if campos_actualizar:
             consulta_actualizacion = "UPDATE usuarios SET " + ", ".join(campos_actualizar) + " WHERE codigo = ?"
             valores.append(codigo)
@@ -437,13 +419,6 @@ def obtener_usuarios_por_codigo(codigo):
         return db.consultar(
             "SELECT * FROM usuarios WHERE codigo = ?",
             (codigo,)
-        )
-        
-def obtener_usuarios_por_fecha_registro(fecha_inicio, fecha_fin):
-    with crear_db() as db:
-        return db.consultar(
-            "SELECT * FROM usuarios WHERE fecha_registro BETWEEN ? AND ?",
-            (fecha_inicio, fecha_fin)
         )
 
 def obtener_catalogo_web():
