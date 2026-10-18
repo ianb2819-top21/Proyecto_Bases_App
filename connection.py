@@ -422,19 +422,21 @@ def obtener_usuarios_por_codigo(codigo):
         )
 
 def obtener_catalogo_web():
-    from db import crear_db # Aseguramos la importación
+    from db import crear_db
     with crear_db() as db:
-        # Usamos JOIN para unir la información del libro con la disponibilidad de su ejemplar
         return db.consultar("""
             SELECT 
                 l.isbn, 
                 l.titulo, 
                 'Ingeniería / Tecnología' AS categoria, 
                 e.estado,
+                GROUP_CONCAT(DISTINCT a.nombre SEPARATOR ', ') AS autor,
                 CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen
             FROM libros l
             JOIN ejemplares e ON l.isbn = e.isbn
-            GROUP BY l.isbn, e.estado
+            LEFT JOIN libro_autor la ON l.isbn = la.isbn
+            LEFT JOIN autores a ON la.id_autor = a.id_autor
+            GROUP BY l.isbn, l.titulo, e.estado
         """)
         
         

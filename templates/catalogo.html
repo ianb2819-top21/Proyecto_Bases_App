@@ -26,7 +26,7 @@
         <!-- Contenedor de la carátula y la etiqueta de estado -->
         <div class="portada-contenedor">
             <img src="{{ libro.imagen }}" alt="Portada de {{ libro.titulo }}">
-            <span class="badge {{ libro.estado }}">{{ libro.estado | capitalize }}</span>
+            <span class="badge {{ libro.estado | lower }}">{{ libro.estado | capitalize }}</span>
         </div>
 
         <!-- Información del libro -->
