@@ -98,6 +98,30 @@ def login():
     return redirect(url_for('catalogo'))
 
 
+@app.route('/registro', methods=['GET', 'POST'])
+def registro():
+    if session.get('codigo'):
+        return redirect(url_for('catalogo'))
+    datos = {}
+    if request.method == 'GET':
+        return render_template('registro.html', datos=datos, error=None)
+    datos = {campo: request.form.get(campo, '').strip()
+             for campo in ('codigo', 'nombres', 'correo', 'rol', 'carrera')}
+    try:
+        connection.registrar_cuenta(datos['codigo'],
+            request.form.get('identificacion', '').strip(), datos['nombres'],
+            datos['correo'], datos['rol'], datos['carrera'])
+    except ValueError as e:
+        return render_template('registro.html', datos=datos, error=str(e)), 400
+    except Exception:
+        app.logger.exception('Error registrando cuenta')
+        return render_template('registro.html', datos=datos,
+            error='No fue posible crear la cuenta. Inténtalo de nuevo más tarde.'), 503
+    flash('Cuenta creada correctamente. Inicia sesión con tu código institucional '
+          'y tu identificación como clave de acceso.', 'ok')
+    return redirect(url_for('login'))
+
+
 @app.route('/logout', methods=['POST'])
 @requiere_login
 def logout():
@@ -130,6 +154,21 @@ def aprobar():
     except Exception:
         app.logger.exception('Error aprobando')
         flash('No se pudo aprobar el préstamo.', 'error')
+    return redirect(url_for('panel_admin'))
+
+
+@app.route('/panel-admin/rechazar', methods=['POST'])
+@requiere_roles(*ROLES_STAFF)
+def rechazar():
+    try:
+        connection.rechazar_prestamo(int(request.form['id_ejemplar']),
+                                     request.form['codigo_usuario'].strip())
+        flash('Solicitud de préstamo rechazada correctamente.', 'ok')
+    except (ValueError, KeyError) as e:
+        flash(str(e), 'error')
+    except Exception:
+        app.logger.exception('Error rechazando préstamo')
+        flash('No se pudo rechazar la solicitud de préstamo.', 'error')
     return redirect(url_for('panel_admin'))
 
 

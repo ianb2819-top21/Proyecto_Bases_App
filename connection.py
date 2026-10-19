@@ -1,4 +1,7 @@
+import re
 from datetime import datetime
+
+from pymysql.err import IntegrityError
 
 from db import crear_db
 
@@ -26,6 +29,39 @@ def registrar_usuario(codigo, identificacion, nombres, correo, rol, carrera=None
             """, (codigo, identificacion, nombres, correo, rol, carrera, estado))
             if rol.lower() == 'administrador':
                 db.ejecutar('INSERT INTO usuario_admin (codigo) VALUES (?)', (codigo,))
+
+
+def registrar_cuenta(codigo, identificacion, nombres, correo, rol, carrera=None):
+    """Registro público limitado a estudiantes y docentes activos."""
+    campos = {
+        'codigo': (codigo.strip(), 20, 'El código institucional'),
+        'identificacion': (identificacion.strip(), 20, 'El número de identificación'),
+        'nombres': (nombres.strip(), 150, 'El nombre completo'),
+        'correo': (correo.strip(), 150, 'El correo'),
+    }
+    for valor, limite, etiqueta in campos.values():
+        if not valor:
+            raise ValueError(f'{etiqueta} es obligatorio.')
+        if len(valor) > limite:
+            raise ValueError(f'{etiqueta} no puede superar {limite} caracteres.')
+
+    rol = rol.strip().lower()
+    if rol not in {'estudiante', 'docente'}:
+        raise ValueError('Selecciona estudiante o docente como tipo de usuario.')
+    correo = campos['correo'][0]
+    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', correo):
+        raise ValueError('Ingresa un correo electrónico válido.')
+    carrera = (carrera or '').strip() or None
+    if carrera and len(carrera) > 150:
+        raise ValueError('La carrera no puede superar 150 caracteres.')
+
+    try:
+        registrar_usuario(campos['codigo'][0], campos['identificacion'][0],
+                          campos['nombres'][0], correo, rol, carrera, estado='activo')
+    except IntegrityError as e:
+        if e.args and e.args[0] == 1062:
+            raise ValueError('Ya existe una cuenta con ese código institucional.') from e
+        raise
 
 
 def consultar_historial_prestamos_por_usuario(codigo):
@@ -59,7 +95,11 @@ def consultar_historial_prestamos_por_usuario(codigo):
             vence = date.fromisoformat(vence)
         devuelto = prestamo['fec_devolucion'] is not None
         dias_restantes = (vence - hoy).days if vence else None
-        if devuelto:
+        estado = str(prestamo['estado'] or '').strip().lower()
+        sin_aprobar = estado in ('pendiente', 'rechazado')
+        if sin_aprobar:
+            estado_visual = estado.capitalize()
+        elif devuelto:
             estado_visual = 'Devuelto'
         elif dias_restantes is not None and dias_restantes < 0:
             estado_visual = 'Vencido'
@@ -83,11 +123,11 @@ def consultar_historial_prestamos_por_usuario(codigo):
 
         dias_retraso = (
             max((fecha_referencia - vence).days, 0)
-            if vence else 0
+            if vence and not sin_aprobar else 0
         )
 
         prestamo['dias_retraso'] = dias_retraso
-        prestamo['dias_restantes'] = dias_restantes if not devuelto else None
+        prestamo['dias_restantes'] = dias_restantes if not devuelto and not sin_aprobar else None
         prestamo['multa_calculada'] = dias_retraso * 2000
 
         # Calculamos la multa según la política de la biblioteca.
@@ -299,14 +339,31 @@ def aprobar_prestamo(id_ejemplar, codigo_usuario):
     return True
 
 def rechazar_prestamo(id_ejemplar, codigo_usuario):
-        
+    """Rechaza una única solicitud pendiente conservando su historial."""
     with crear_db() as db:
-      
-        db.ejecutar(
-            "UPDATE prestamos SET estado = 'rechazado' "
-            "WHERE id_ejemplar = ? AND codigo_usuario = ? AND estado = 'pendiente'",
-            (id_ejemplar, codigo_usuario)
-        )
+        with db.transaccion():
+            # Mismo orden de bloqueo que solicitar y aprobar.
+            ejemplar = db.consultar(
+                'SELECT estado FROM ejemplares WHERE id_ejemplar = ? FOR UPDATE',
+                (id_ejemplar,))
+            if not ejemplar:
+                raise ValueError('El ejemplar no existe.')
+            pendientes = db.consultar("""
+                SELECT fec_prestamo FROM prestamos
+                WHERE id_ejemplar = ? AND codigo_usuario = ?
+                  AND LOWER(estado) = 'pendiente' AND fec_devolucion IS NULL
+                FOR UPDATE
+            """, (id_ejemplar, codigo_usuario))
+            if len(pendientes) != 1:
+                raise ValueError('No se encontró una única solicitud pendiente.')
+            filas = db.ejecutar("""
+                UPDATE prestamos SET estado = 'rechazado'
+                WHERE id_ejemplar = ? AND codigo_usuario = ? AND fec_prestamo = ?
+                  AND LOWER(estado) = 'pendiente' AND fec_devolucion IS NULL
+            """, (id_ejemplar, codigo_usuario, pendientes[0]['fec_prestamo']))
+            if filas != 1:
+                raise ValueError('No se pudo rechazar la solicitud de préstamo.')
+    return True
         
 def obtener_prestamos_pendientes():
     with crear_db() as db:
