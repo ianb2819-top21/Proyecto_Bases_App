@@ -532,6 +532,7 @@ def obtener_usuarios_por_codigo(codigo):
 
 
 def obtener_catalogo_web():
+    """Muestra todos los títulos aunque no haya copias disponibles."""
     with crear_db() as db:
         return db.consultar("""
             SELECT l.isbn, l.titulo,
@@ -539,8 +540,11 @@ def obtener_catalogo_web():
                   FROM libro_categoria WHERE isbn = l.isbn), 'Sin categoría') AS categoria,
                 COALESCE((SELECT GROUP_CONCAT(autor SEPARATOR ', ')
                   FROM libro_autor WHERE isbn = l.isbn), 'Sin autor') AS autor,
-                CASE WHEN EXISTS(SELECT 1 FROM ejemplares e
-                     WHERE e.isbn = l.isbn AND LOWER(e.estado) = 'disponible')
+                (SELECT COUNT(*) FROM ejemplares e WHERE e.isbn = l.isbn) AS total_ejemplares,
+                (SELECT COUNT(*) FROM ejemplares e WHERE e.isbn = l.isbn
+                 AND LOWER(e.estado) = 'disponible') AS disponibles,
+                CASE WHEN EXISTS (SELECT 1 FROM ejemplares e WHERE e.isbn = l.isbn
+                      AND LOWER(e.estado) = 'disponible')
                      THEN 'Disponible' ELSE 'No disponible' END AS estado,
                 CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen,
                 (SELECT MIN(e.id_ejemplar) FROM ejemplares e
@@ -564,4 +568,5 @@ def buscar_usuario_por_codigo(codigo):
 
     return usuarios[0] if usuarios else None
 
-    
+        
+        

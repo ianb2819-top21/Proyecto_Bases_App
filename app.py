@@ -211,6 +211,48 @@ def libro_form(isbn=None):
     return render_template('libro_form.html', libro=libro, nuevo=nuevo), 400
 
 
+@app.route('/libros/<isbn>/ejemplares')
+@requiere_roles('administrador')
+def gestionar_ejemplares(isbn):
+    try:
+        libro, ejemplares = admin_ops.detalle_ejemplares(isbn)
+    except ValueError:
+        abort(404)
+    except Exception:
+        app.logger.exception('Error consultando ejemplares')
+        abort(503)
+    return render_template('ejemplares_form.html', libro=libro, ejemplares=ejemplares,
+                           estados=admin_ops.ESTADOS_EDITABLES)
+
+
+@app.route('/libros/<isbn>/ejemplares/cantidad', methods=['POST'])
+@requiere_roles('administrador')
+def editar_cantidad_ejemplares(isbn):
+    try:
+        admin_ops.ajustar_cantidad_ejemplares(isbn, request.form.get('cantidad', ''))
+        flash('Cantidad de ejemplares actualizada.', 'ok')
+    except ValueError as e:
+        flash(str(e), 'error')
+    except Exception:
+        app.logger.exception('Error ajustando cantidad')
+        flash('No fue posible actualizar la cantidad.', 'error')
+    return redirect(url_for('gestionar_ejemplares', isbn=isbn))
+
+
+@app.route('/libros/<isbn>/ejemplares/<int:id_ejemplar>/estado', methods=['POST'])
+@requiere_roles('administrador')
+def editar_estado_ejemplar(isbn, id_ejemplar):
+    try:
+        admin_ops.modificar_estado_ejemplar(isbn, id_ejemplar, request.form.get('estado', ''))
+        flash('Estado actualizado.', 'ok')
+    except ValueError as e:
+        flash(str(e), 'error')
+    except Exception:
+        app.logger.exception('Error actualizando estado')
+        flash('No fue posible actualizar el estado.', 'error')
+    return redirect(url_for('gestionar_ejemplares', isbn=isbn))
+
+
 @app.route('/libros/<isbn>/borrar', methods=['POST'])
 @requiere_roles('administrador')
 def borrar_libro(isbn):

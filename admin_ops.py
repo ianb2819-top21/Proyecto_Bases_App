@@ -106,3 +106,74 @@ def resumen_reportes():
         if isinstance(vence, str): vence = date.fromisoformat(vence)
         p['vencido'] = bool(vence and vence < hoy)
     return por_estado, top, activos
+
+
+# Los estados pertenecen a ejemplares, no a la tabla libros.
+ESTADOS_EDITABLES = ('Disponible', 'Mantenimiento', 'Dañado', 'Perdido')
+
+
+def detalle_ejemplares(isbn):
+    with crear_db() as db:
+        libros = db.consultar('SELECT isbn, titulo FROM libros WHERE isbn = ?', (isbn,))
+        if not libros:
+            raise ValueError('El libro no existe.')
+        ejemplares = db.consultar('''
+            SELECT e.id_ejemplar, e.sala, e.estante, e.estado,
+              EXISTS(SELECT 1 FROM prestamos p
+                WHERE p.id_ejemplar = e.id_ejemplar
+                  AND p.fec_devolucion IS NULL
+                  AND LOWER(p.estado) IN ('pendiente', 'aprobado', 'activo')) AS comprometido,
+              EXISTS(SELECT 1 FROM prestamos p
+                WHERE p.id_ejemplar = e.id_ejemplar) AS tiene_historial
+            FROM ejemplares e WHERE e.isbn = ? ORDER BY e.id_ejemplar
+        ''', (isbn,))
+    return libros[0], ejemplares
+
+
+def ajustar_cantidad_ejemplares(isbn, cantidad):
+    if isinstance(cantidad, str) and not cantidad.isdecimal():
+        raise ValueError('La cantidad debe ser un número entero no negativo.')
+    cantidad = int(cantidad)
+    if cantidad < 0 or cantidad > 10000:
+        raise ValueError('La cantidad debe estar entre 0 y 10000.')
+    with crear_db() as db:
+        with db.transaccion():
+            libros = db.consultar('SELECT isbn FROM libros WHERE isbn = ? FOR UPDATE', (isbn,))
+            if not libros:
+                raise ValueError('Libro no encontrado.')
+            ejemplares = db.consultar('SELECT id_ejemplar, estado FROM ejemplares WHERE isbn = ? ORDER BY id_ejemplar FOR UPDATE', (isbn,))
+            actuales = len(ejemplares)
+            if cantidad > actuales:
+                for _ in range(cantidad - actuales):
+                    db.ejecutar("INSERT INTO ejemplares (isbn, estado) VALUES (?, 'Disponible')", (isbn,))
+            elif cantidad < actuales:
+                quitar = actuales - cantidad
+                # Nunca se borran ejemplares con historial de préstamos, ni siquiera devueltos.
+                eliminables = db.consultar('''
+                    SELECT e.id_ejemplar FROM ejemplares e
+                    WHERE e.isbn = ? AND LOWER(e.estado) = 'disponible'
+                    AND NOT EXISTS (SELECT 1 FROM prestamos p WHERE p.id_ejemplar = e.id_ejemplar)
+                    ORDER BY e.id_ejemplar DESC LIMIT ?
+                ''', (isbn, quitar))
+                if len(eliminables) != quitar:
+                    raise ValueError('No es posible reducir esa cantidad: solo pueden eliminarse ejemplares disponibles sin historial de préstamos.')
+                for item in eliminables:
+                    db.ejecutar('DELETE FROM ejemplares WHERE id_ejemplar = ?', (item['id_ejemplar'],))
+    return cantidad
+
+
+def modificar_estado_ejemplar(isbn, id_ejemplar, estado):
+    if estado not in ESTADOS_EDITABLES:
+        raise ValueError('Estado inválido. El estado Prestado se establece al aprobar un préstamo.')
+    with crear_db() as db:
+        with db.transaccion():
+            filas = db.consultar('''SELECT id_ejemplar, estado FROM ejemplares
+                WHERE isbn = ? AND id_ejemplar = ? FOR UPDATE''', (isbn, id_ejemplar))
+            if not filas:
+                raise ValueError('Ejemplar no encontrado.')
+            activo = db.consultar('''SELECT 1 FROM prestamos
+                WHERE id_ejemplar = ? AND fec_devolucion IS NULL
+                AND LOWER(estado) IN ('pendiente', 'aprobado', 'activo') LIMIT 1''', (id_ejemplar,))
+            if activo or str(filas[0]['estado']).strip().lower() == 'prestado':
+                raise ValueError('Este ejemplar tiene un préstamo/solicitud vigente o figura como Prestado. Gestiona primero su devolución.')
+            db.ejecutar('UPDATE ejemplares SET estado = ? WHERE id_ejemplar = ?', (estado, id_ejemplar))

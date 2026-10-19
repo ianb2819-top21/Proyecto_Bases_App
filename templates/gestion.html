@@ -5,7 +5,7 @@
 <h2>Libros</h2><p><a href="{{ url_for('libro_form') }}">+ Nuevo libro</a></p>
 <table><tr><th>ISBN</th><th>Título</th><th>Acciones</th></tr>
 {% for l in libros %}<tr><td>{{ l.isbn }}</td><td>{{ l.titulo }}</td><td>
-<a href="{{ url_for('libro_form',isbn=l.isbn) }}">Editar</a>
+<a href="{{ url_for('libro_form',isbn=l.isbn) }}">Editar</a> · <a href="{{ url_for('gestionar_ejemplares',isbn=l.isbn) }}">Ejemplares / estados</a>
 <form method="post" action="{{ url_for('borrar_libro',isbn=l.isbn) }}" class="inline-form" onsubmit="return confirm('¿Eliminar libro?');">
 <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit">Borrar</button></form>
 </td></tr>{% endfor %}</table>

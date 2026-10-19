@@ -16,6 +16,7 @@
 <div class="card-info"><span class="categoria">{{ libro.categoria }}</span>
 <h3 class="titulo">{{ libro.titulo }}</h3><p class="autor">Por {{ libro.autor }}</p>
 <p class="isbn"><strong>ISBN:</strong> {{ libro.isbn }}</p>
+<p class="isbn"><strong>Ejemplares:</strong> {{ libro.total_ejemplares }} · <strong>Disponibles:</strong> {{ libro.disponibles }}</p>
 <div class="acciones-card">
 {% if session.get('rol') in ['estudiante','docente'] %}
 {% if libro.id_disponible %}
@@ -28,6 +29,7 @@
 {% elif session.get('rol') == 'administrador' %}
 <div class="botones-admin-card">
 <a href="{{ url_for('libro_form', isbn=libro.isbn) }}" class="btn-editar">✏️ Editar</a>
+<a href="{{ url_for('gestionar_ejemplares', isbn=libro.isbn) }}" class="btn-editar">📚 Ejemplares y estados</a>
 <form method="post" action="{{ url_for('borrar_libro', isbn=libro.isbn) }}"
 onsubmit="return confirm('¿Borrar este libro? Si tiene ejemplares no se permitirá.');">
 <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
