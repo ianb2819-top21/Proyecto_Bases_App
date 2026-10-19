@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Reportes e Inventario</h1>
+<h2>Ejemplares por estado</h2><table><tr><th>Estado</th><th>Cantidad</th></tr>
+{% for e in estados %}<tr><td>{{ e.estado }}</td><td>{{ e.total }}</td></tr>{% endfor %}</table>
+<h2>Libros más prestados (histórico)</h2><table><tr><th>Título</th><th>ISBN</th><th>Préstamos</th></tr>
+{% for p in populares %}<tr><td>{{ p.titulo }}</td><td>{{ p.isbn }}</td><td>{{ p.total }}</td></tr>{% endfor %}</table>
+<h2>Préstamos activos y vencidos</h2><table><tr><th>Usuario</th><th>Libro</th><th>Vencimiento</th><th>Situación</th></tr>
+{% for p in activos %}<tr><td>{{ p.nombres }}</td><td>{{ p.titulo }}</td><td>{{ p.fec_vencimiento or 'Sin fecha' }}</td>
+<td>{{ 'Vencido' if p.vencido else 'Activo' }}</td></tr>{% endfor %}</table>
+{% endblock %}

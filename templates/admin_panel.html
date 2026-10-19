@@ -24,6 +24,7 @@
 
 <div class="admin-wrap">
   <h1>Panel de administración</h1>
+  {% if error %}<p class="flash error">{{ error }}</p>{% endif %}
 
   {% with mensajes = get_flashed_messages(with_categories=true) %}
     {% for categoria, texto in mensajes %}
@@ -47,6 +48,7 @@
         <td>{{ p.fec_prestamo }}</td>
         <td>
           <form method="post" action="{{ url_for('aprobar') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <input type="hidden" name="id_ejemplar" value="{{ p.id_ejemplar }}">
             <input type="hidden" name="codigo_usuario" value="{{ p.codigo_usuario }}">
             <button type="submit" class="btn btn-aprobar">Aprobar</button>
@@ -77,6 +79,7 @@
         <td>
           {% if e.estado|lower == 'prestado' %}
           <form method="post" action="{{ url_for('devolver') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <input type="hidden" name="id_ejemplar" value="{{ e.id_ejemplar }}">
             <input type="text" name="observaciones" placeholder="Observaciones (opcional)">
             <button type="submit" class="btn btn-devolver">Registrar Devolución</button>

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Gestión BD — Usuarios y Libros</h1>
+{% with mensajes = get_flashed_messages(with_categories=true) %}{% for tipo, mensaje in mensajes %}
+<p class="flash {{ tipo }}">{{ mensaje }}</p>{% endfor %}{% endwith %}
+<h2>Libros</h2><p><a href="{{ url_for('libro_form') }}">+ Nuevo libro</a></p>
+<table><tr><th>ISBN</th><th>Título</th><th>Acciones</th></tr>
+{% for l in libros %}<tr><td>{{ l.isbn }}</td><td>{{ l.titulo }}</td><td>
+<a href="{{ url_for('libro_form',isbn=l.isbn) }}">Editar</a>
+<form method="post" action="{{ url_for('borrar_libro',isbn=l.isbn) }}" class="inline-form" onsubmit="return confirm('¿Eliminar libro?');">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit">Borrar</button></form>
+</td></tr>{% endfor %}</table>
+<h2>Crear usuario</h2>
+<form class="form-admin" method="post" action="{{ url_for('crear_usuario') }}">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<label>Código <input name="codigo" required maxlength="20"></label>
+<label>Identificación (clave de acceso actual) <input name="identificacion" required maxlength="20"></label>
+<label>Nombre <input name="nombres" required maxlength="150"></label>
+<label>Correo <input name="correo" type="email" required maxlength="150"></label>
+<label>Carrera <input name="carrera" maxlength="150"></label>
+<label>Rol <select name="rol"><option value="estudiante">Estudiante</option><option value="docente">Docente</option><option value="bibliotecario">Bibliotecario</option><option value="administrador">Administrador</option></select></label>
+<button type="submit">Crear usuario</button></form>
+<h2>Usuarios</h2><table><tr><th>Código</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acción</th></tr>
+{% for u in usuarios %}<tr><td>{{ u.codigo }}</td><td>{{ u.nombres }}</td><td>{{ u.rol }}</td><td>{{ u.estado }}</td>
+<td><form method="post" action="{{ url_for('estado_usuario',codigo=u.codigo) }}" class="inline-form">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<input type="hidden" name="estado" value="{{ 'Bloqueado' if u.estado|lower == 'activo' else 'Activo' }}">
+<button type="submit">{{ 'Bloquear' if u.estado|lower == 'activo' else 'Activar' }}</button>
+</form></td></tr>{% endfor %}</table>
+{% endblock %}

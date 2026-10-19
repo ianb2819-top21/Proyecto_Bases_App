@@ -46,10 +46,10 @@
             {% if session.get('rol') in ['bibliotecario', 'administrador'] %}
 
                 <a href="{{ url_for('panel_admin') }}" class="nav-especial">
-                Aprobar / Devolver
+                    Aprobar / Devolver
                 </a>
 
-                <a href="#" class="nav-especial">
+                <a href="{{ url_for('reportes') }}" class="nav-especial">
                     Reportes e Inventario
                 </a>
 
@@ -58,7 +58,7 @@
             <!-- SOLO ADMINISTRADOR -->
             {% if session.get('rol') == 'administrador' %}
 
-                <a href="#" class="nav-admin">
+                <a href="{{ url_for('gestion') }}" class="nav-admin">
                     Gestión BD (Usuarios/Libros)
                 </a>
 
@@ -76,6 +76,7 @@
             <form method="POST"
                   action="{{ url_for('logout') }}">
 
+                <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
                 <button type="submit" class="btn-login">
                     Cerrar sesión
                 </button>

@@ -1,74 +1,37 @@
-<!-- 1. HERENCIA: Le decimos a Flask que use el molde base.html -->
 {% extends 'base.html' %}
-
-<!-- 2. RELLENO: Todo lo que esté aquí adentro se meterá en el "hueco" de base.html -->
 {% block content %}
-
-<section class="hero">
-    <div class="hero-texto">
-        <h1>Catálogo de la Biblioteca</h1>
-        <p>Explora los títulos disponibles, revisa sus carátulas y gestiona préstamos en tiempo real.</p>
-    </div>
-
-    <!-- SOLO EL ADMIN ve el botón para agregar un libro nuevo al catálogo (CRUD) -->
-    {% if session.get('rol') == 'administrador' %}
-        <button class="btn-agregar-libro">+ Nuevo Libro (BD)</button>
-    {% endif %}
-</section>
-
-<!-- 3. CUADRÍCULA DE LIBROS -->
+<section class="hero"><div class="hero-texto"><h1>Catálogo de la Biblioteca</h1>
+<p>Consulta los libros y su disponibilidad.</p></div>
+{% if session.get('rol') == 'administrador' %}
+<a class="btn-agregar-libro" href="{{ url_for('libro_form') }}">+ Nuevo Libro (BD)</a>
+{% endif %}</section>
+{% if error %}<p class="flash error">{{ error }}</p>{% endif %}
+{% with mensajes = get_flashed_messages(with_categories=true) %}
+{% for categoria, mensaje in mensajes %}<p class="flash {{ categoria }}">{{ mensaje }}</p>{% endfor %}{% endwith %}
 <div class="grid-libros">
-    
-    <!-- Iniciamos el ciclo FOR para recorrer cada libro que nos mandó app.py -->
-    {% for libro in libros %}
-    <div class="card-libro">
-        
-        <!-- Contenedor de la carátula y la etiqueta de estado -->
-        <div class="portada-contenedor">
-            <img src="{{ libro.imagen }}" alt="Portada de {{ libro.titulo }}">
-            <span class="badge {{ libro.estado | lower }}">{{ libro.estado | capitalize }}</span>
-        </div>
-
-        <!-- Información del libro -->
-        <div class="card-info">
-            <span class="categoria">{{ libro.categoria }}</span>
-            <h3 class="titulo">{{ libro.titulo }}</h3>
-            <p class="autor">Por {{ libro.autor }}</p>
-            <p class="isbn"><strong>ISBN:</strong> {{ libro.isbn }}</p>
-            
-            <!-- 4. BOTONES DINÁMICOS SEGÚN EL ROL DEL USUARIO -->
-            <div class="acciones-card">
-                
-                <!-- Vista para ESTUDIANTES y DOCENTES -->
-                {% if session.get('rol') in ['estudiante', 'docente'] %}
-                    {% if libro.estado | lower == 'disponible' %}
-                        <button class="btn-solicitar">Solicitar Préstamo</button>
-                    {% else %}
-                        <button class="btn-deshabilitado" disabled>No disponible</button>
-                    {% endif %}
-                
-                <!-- Vista para el BIBLIOTECARIO -->
-                {% elif session.get('rol') == 'bibliotecario' %}
-                    {% if libro.estado == 'prestado' %}
-                        <button class="btn-devolver">Registrar Devolución</button>
-                    {% else %}
-                        <button class="btn-aprobar">Prestar Manualmente</button>
-                    {% endif %}
-
-                <!-- Vista para el ADMINISTRADOR (Control total CRUD) -->
-                {% elif session.get('rol') == 'administrador' %}
-                    <div class="botones-admin-card">
-                        <button class="btn-editar">✏️ Editar</button>
-                        <button class="btn-eliminar">🗑️ Borrar</button>
-                    </div>
-                {% endif %}
-
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-    <!-- Aquí termina el ciclo FOR -->
-
-</div>
-
+{% for libro in libros %}
+<div class="card-libro">
+<div class="portada-contenedor"><img src="{{ libro.imagen }}" alt="Portada de {{ libro.titulo }}">
+<span class="badge {{ libro.estado|lower }}">{{ libro.estado }}</span></div>
+<div class="card-info"><span class="categoria">{{ libro.categoria }}</span>
+<h3 class="titulo">{{ libro.titulo }}</h3><p class="autor">Por {{ libro.autor }}</p>
+<p class="isbn"><strong>ISBN:</strong> {{ libro.isbn }}</p>
+<div class="acciones-card">
+{% if session.get('rol') in ['estudiante','docente'] %}
+{% if libro.id_disponible %}
+<form method="post" action="{{ url_for('solicitar', id_ejemplar=libro.id_disponible) }}">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<button type="submit" class="btn-solicitar">Solicitar Préstamo</button></form>
+{% else %}<button disabled class="btn-deshabilitado">No disponible</button>{% endif %}
+{% elif session.get('rol') == 'bibliotecario' %}
+<a href="{{ url_for('panel_admin') }}" class="btn-aprobar">Gestionar préstamos</a>
+{% elif session.get('rol') == 'administrador' %}
+<div class="botones-admin-card">
+<a href="{{ url_for('libro_form', isbn=libro.isbn) }}" class="btn-editar">✏️ Editar</a>
+<form method="post" action="{{ url_for('borrar_libro', isbn=libro.isbn) }}"
+onsubmit="return confirm('¿Borrar este libro? Si tiene ejemplares no se permitirá.');">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<button type="submit" class="btn-eliminar">🗑️ Borrar</button></form>
+</div>{% endif %}</div></div></div>
+{% endfor %}</div>
 {% endblock %}

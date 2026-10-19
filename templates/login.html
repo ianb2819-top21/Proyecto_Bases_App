@@ -20,6 +20,7 @@
             {% endif %}
 
             <form method="POST" action="{{ url_for('login') }}">
+                <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
                 <div class="login-field">
                     <label for="codigo">Código institucional</label>
                     <input type="text" id="codigo" name="codigo"

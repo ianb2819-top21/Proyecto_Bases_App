@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block content %}
+<h1>{{ 'Nuevo Libro' if nuevo else 'Editar Libro' }}</h1>
+{% with m = get_flashed_messages(with_categories=true) %}{% for tipo, mensaje in m %}
+<p class="flash {{ tipo }}">{{ mensaje }}</p>{% endfor %}{% endwith %}
+<form class="form-admin" method="post">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<label>ISBN <input name="isbn" value="{{ libro.get('isbn','') }}" {{ 'readonly' if not nuevo else 'required' }} maxlength="20"></label>
+<label>Título <input name="titulo" required maxlength="200" value="{{ libro.get('titulo','') }}"></label>
+<label>Editorial <input name="editorial" maxlength="150" value="{{ libro.get('editorial','') or '' }}"></label>
+<label>Año <input name="anio" type="number" min="1" max="9999" value="{{ libro.get('anio', libro.get('año','')) or '' }}"></label>
+<label>Descripción <textarea name="descripcion" maxlength="500">{{ libro.get('descripcion','') or '' }}</textarea></label>
+<label>Autores (separados por coma) <input name="autores" value="{{ libro.get('autores','') or '' }}"></label>
+<label>Categorías (separadas por coma) <input name="categorias" value="{{ libro.get('categorias','') or '' }}"></label>
+<button class="btn-aprobar" type="submit">Guardar</button> <a href="{{ url_for('gestion') }}">Cancelar</a>
+</form>{% endblock %}
