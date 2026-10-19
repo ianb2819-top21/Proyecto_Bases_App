@@ -1,10 +1,354 @@
-{% extends 'base.html' %}{% block content %}
-<h1>Reportes e Inventario</h1>
-<h2>Ejemplares por estado</h2><table><tr><th>Estado</th><th>Cantidad</th></tr>
-{% for e in estados %}<tr><td>{{ e.estado }}</td><td>{{ e.total }}</td></tr>{% endfor %}</table>
-<h2>Libros más prestados (histórico)</h2><table><tr><th>Título</th><th>ISBN</th><th>Préstamos</th></tr>
-{% for p in populares %}<tr><td>{{ p.titulo }}</td><td>{{ p.isbn }}</td><td>{{ p.total }}</td></tr>{% endfor %}</table>
-<h2>Préstamos activos y vencidos</h2><table><tr><th>Usuario</th><th>Libro</th><th>Vencimiento</th><th>Situación</th></tr>
-{% for p in activos %}<tr><td>{{ p.nombres }}</td><td>{{ p.titulo }}</td><td>{{ p.fec_vencimiento or 'Sin fecha' }}</td>
-<td>{{ 'Vencido' if p.vencido else 'Activo' }}</td></tr>{% endfor %}</table>
+
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+  .reportes-wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    color: #f8fafc;
+  }
+
+  .reportes-wrap h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+  }
+
+  .reportes-subtitulo {
+    color: #94a3b8;
+    font-size: 1.1rem;
+    margin-bottom: 3rem;
+  }
+
+  /* Tarjetas de resumen */
+  .reportes-resumen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+
+  .reporte-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 15px;
+    padding: 28px;
+  }
+
+  .reporte-label {
+    color: #94a3b8;
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+
+  .reporte-valor {
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  /* Secciones */
+  .reporte-seccion {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 15px;
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+
+  .reporte-seccion h2 {
+    font-size: 1.5rem;
+    margin: 0 0 24px;
+    color: #fff;
+  }
+
+  /* Filas del inventario */
+  .reporte-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding: 16px 0;
+    border-bottom: 1px solid #334155;
+  }
+
+  .reporte-fila:last-child {
+    border-bottom: none;
+  }
+
+  .reporte-titulo {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .reporte-detalle {
+    color: #94a3b8;
+    margin-top: 6px;
+  }
+
+  /* Etiquetas de estado */
+  .reporte-badge {
+    display: inline-block;
+    padding: 7px 15px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .reporte-disponible {
+    background: #166534;
+    color: #dcfce7;
+  }
+
+  .reporte-vencido {
+    background: #7f1d1d;
+    color: #fee2e2;
+  }
+
+  .reporte-activo {
+    background: #1e40af;
+    color: #dbeafe;
+  }
+
+  .reporte-neutral {
+    background: #334155;
+    color: #f8fafc;
+  }
+
+  /* Información de préstamos */
+  .reporte-prestamo {
+    padding: 18px 0;
+    border-bottom: 1px solid #334155;
+  }
+
+  .reporte-prestamo:last-child {
+    border-bottom: none;
+  }
+
+  .reporte-prestamo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .reporte-prestamo-info {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin-top: 28px;
+  }
+
+  .reporte-info-label {
+    color: #94a3b8;
+    margin-bottom: 10px;
+  }
+
+  .reporte-info-valor {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .reporte-vacio {
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  @media (max-width: 768px) {
+    .reportes-resumen {
+      grid-template-columns: 1fr;
+    }
+
+    .reporte-prestamo-info {
+      grid-template-columns: 1fr;
+    }
+
+    .reportes-wrap h1 {
+      font-size: 2rem;
+    }
+
+    .reporte-seccion {
+      padding: 20px;
+    }
+  }
+</style>
+
+<div class="reportes-wrap">
+
+  <h1>Reportes e Inventario</h1>
+  <p class="reportes-subtitulo">
+    Consulta el estado del inventario, los libros más
+    prestados y los préstamos activos.
+  </p>
+
+  <!-- TARJETAS DE RESUMEN -->
+  <div class="reportes-resumen">
+
+    <div class="reporte-card">
+      <div class="reporte-label">Total ejemplares</div>
+      <div class="reporte-valor">
+        {{ estados | sum(attribute='total') }}
+      </div>
+    </div>
+
+    <div class="reporte-card">
+      <div class="reporte-label">Libros más prestados</div>
+      <div class="reporte-valor">
+        {{ populares | length }}
+      </div>
+    </div>
+
+    <div class="reporte-card">
+      <div class="reporte-label">Préstamos activos y vencidos</div>
+      <div class="reporte-valor">
+        {{ activos | length }}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- EJEMPLARES POR ESTADO -->
+  <section class="reporte-seccion">
+
+    <h2>Ejemplares por estado</h2>
+
+    {% for e in estados %}
+    <div class="reporte-fila">
+
+      <div>
+        <div class="reporte-titulo">
+          {{ e.estado | capitalize }}
+        </div>
+        <div class="reporte-detalle">
+          Cantidad de ejemplares
+        </div>
+      </div>
+
+      <span class="reporte-badge
+        {% if e.estado | lower == 'disponible' %}
+          reporte-disponible
+        {% else %}
+          reporte-neutral
+        {% endif %}">
+        {{ e.total }}
+      </span>
+
+    </div>
+    {% else %}
+    <p class="reporte-vacio">
+      No hay ejemplares registrados.
+    </p>
+    {% endfor %}
+
+  </section>
+
+  <!-- LIBROS MÁS PRESTADOS -->
+  <section class="reporte-seccion">
+
+    <h2>Libros más prestados (histórico)</h2>
+
+    {% for p in populares %}
+    <div class="reporte-fila">
+
+      <div>
+        <div class="reporte-titulo">
+          {{ p.titulo }}
+        </div>
+        <div class="reporte-detalle">
+          ISBN: {{ p.isbn }}
+        </div>
+      </div>
+
+      <span class="reporte-badge reporte-neutral">
+        {{ p.total }}
+        {{ 'préstamo' if p.total == 1 else 'préstamos' }}
+      </span>
+
+    </div>
+    {% else %}
+    <p class="reporte-vacio">
+      Todavía no hay préstamos registrados.
+    </p>
+    {% endfor %}
+
+  </section>
+
+  <!-- PRÉSTAMOS ACTIVOS Y VENCIDOS -->
+  <section class="reporte-seccion">
+
+    <h2>Préstamos activos y vencidos</h2>
+
+    {% for p in activos %}
+    <div class="reporte-prestamo">
+
+      <div class="reporte-prestamo-header">
+
+        <div>
+          <div class="reporte-titulo">
+            {{ p.titulo }}
+          </div>
+
+          <div class="reporte-detalle">
+            Usuario: {{ p.nombres }}
+          </div>
+        </div>
+
+        {% if p.vencido %}
+        <span class="reporte-badge reporte-vencido">
+          Vencido
+        </span>
+        {% else %}
+        <span class="reporte-badge reporte-activo">
+          Activo
+        </span>
+        {% endif %}
+
+      </div>
+
+      <div class="reporte-prestamo-info">
+
+        <div>
+          <div class="reporte-info-label">
+            Usuario
+          </div>
+          <div class="reporte-info-valor">
+            {{ p.nombres }}
+          </div>
+        </div>
+
+        <div>
+          <div class="reporte-info-label">
+            Vencimiento
+          </div>
+          <div class="reporte-info-valor">
+            {{ p.fec_vencimiento or 'Sin fecha' }}
+          </div>
+        </div>
+
+        <div>
+          <div class="reporte-info-label">
+            Situación
+          </div>
+          <div class="reporte-info-valor">
+            {{ 'Vencido' if p.vencido else 'Activo' }}
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+    {% else %}
+    <p class="reporte-vacio">
+      No hay préstamos activos ni vencidos.
+    </p>
+    {% endfor %}
+
+  </section>
+
+</div>
+
 {% endblock %}
