@@ -280,3 +280,115 @@ body {
 .nota-prestamo.alerta{color:#fca5a5}.nota-prestamo.advertencia{color:#fcd34d}
 .aviso-error{border-color:#dc2626;color:#fecaca}
 @media(max-width:720px){.resumen-prestamos{grid-template-columns:1fr}.prestamo-detalles{grid-template-columns:repeat(2,minmax(0,1fr))}.prestamo-cabecera{flex-direction:column}}
+
+/* ===== LOGIN BIBLIOUNINORTE ===== */
+
+.login-container {
+    min-height: 75vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 430px;
+    background: #172238;
+    padding: 40px;
+    border-radius: 16px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+.login-icon {
+    font-size: 45px;
+    margin-bottom: 15px;
+}
+
+.login-card h1 {
+    font-size: 25px;
+    margin-bottom: 10px;
+}
+
+.login-card p {
+    color: #aebbd0;
+    margin-bottom: 25px;
+}
+
+.login-field {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.login-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.login-field input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #34445f;
+    border-radius: 8px;
+    background: #0e1729;
+    color: white;
+    box-sizing: border-box;
+}
+
+.login-field input:focus {
+    outline: none;
+    border-color: #4a90e2;
+}
+
+.login-button {
+    width: 100%;
+    padding: 13px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.login-button:hover {
+    background: #1d4ed8;
+}
+
+.login-error {
+    padding: 12px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    background: #54232b;
+    color: #ffd5d5;
+}
+
+.login-register {
+    margin-top: 22px;
+}
+
+.login-register a {
+    color: #60a5fa;
+}
+
+/* PERFIL DE USUARIO Y LOGOUT */
+
+.perfil-usuario {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.perfil-usuario form {
+    margin: 0;
+}
+
+.perfil-usuario button.btn-login {
+    cursor: pointer;
+    font: inherit;
+    border: none;
+}

@@ -1,9 +1,11 @@
 import os
+import traceback
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dotenv import load_dotenv
 import pymysql
 from pymysql.cursors import DictCursor
+from urllib.parse import urlparse
 
 # 1. INTERFAZ COMÚN
 class BaseDatos(ABC):
@@ -53,53 +55,25 @@ class BaseDatos(ABC):
     def __exit__(self, *args):
         self.cerrar()
 
-# 2. MOTOR MYSQL (SIN URLPARSE)
+# 2. MOTOR MYSQL LOCAL (LIMPIO)
 class MySQLDB(BaseDatos):
     def __init__(self, url):
-        import pymysql
-        from pymysql.cursors import DictCursor
-        
+        # Desarmamos tu DATABASE_URL para extraer el root y la contraseña
         if isinstance(url, bytes):
             url = url.decode("utf-8")
 
         u = urlparse(url)
         nombre_bd = u.path.lstrip("/")
-    
-        # 1. CONEXIÓN TEMPORAL: Solo para ver si la BD existe y crearla
-        conn_temp = pymysql.connect(
-            host=u.hostname,
-            port=u.port or 3306,
-            user=u.username,
-            password=u.password,
-            charset="utf8mb4",
-            autocommit=True,
-        )
-        try:
-            with conn_temp.cursor() as cur:
-                cur.execute("SHOW DATABASES LIKE %s", (nombre_bd,))
-                if not cur.fetchone():
-                    # Si no existe, ejecuta el archivo SQL
-                    try:
-                        script = SCHEMA_PATH.read_text(encoding="utf-8")
-                        for sentencia in _sentencias(script):
-                            cur.execute(sentencia)
-                    except Exception:
-                        cur.execute(f"DROP DATABASE IF EXISTS `{nombre_bd}`") 
-                        raise
-        finally:
-            conn_temp.close() # Cerramos el instalador
-            
-        # 2. CONEXIÓN PERMANENTE: Esta es la que usará tu aplicación viva
-        # CRÍTICO: Aquí usamos 'self.conn' y agregamos el 'DictCursor'
+
+        # Conexión directa a tu MySQL Workbench local
         self.conn = pymysql.connect(
-            host=os.getenv("DB_HOST"),
-            port=3306,
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASS"),
-            database=os.getenv("DB_NAME"),
+            host=u.hostname or "localhost",
+            port=u.port or 3306,
+            user=u.username or "root",
+            password=u.password or "",
+            database=nombre_bd,
             charset="utf8mb4",
-            cursorclass=DictCursor,
-            ssl={} # El escudo que evita el error de los bytes
+            cursorclass=DictCursor
         )
 
     def consultar(self, sql, params=()):
@@ -124,22 +98,19 @@ class MySQLDB(BaseDatos):
 
     def cerrar(self):
         self.conn.close()
-        
-def crear_db(url=None):
-    import traceback
 
+# 3. PUENTE DE CONEXIÓN
+def crear_db(url=None):
     try:
         load_dotenv()
         url = url or os.getenv("DATABASE_URL")
-
+        
         if not url:
             raise ValueError("No se encontró DATABASE_URL en el archivo .env")
 
-        print("Intentando conectar con MySQL...")
-
+        print("Intentando conectar con MySQL Local...")
         db = MySQLDB(url)
-
-        print("Conexión con MySQL exitosa")
+        print("Conexión con MySQL Local exitosa")
         return db
 
     except Exception as e:
