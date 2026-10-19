@@ -496,12 +496,11 @@ def obtener_catalogo_web():
                 l.titulo, 
                 'Ingeniería / Tecnología' AS categoria, 
                 e.estado,
-                GROUP_CONCAT(DISTINCT a.nombre SEPARATOR ', ') AS autor,
+                GROUP_CONCAT(DISTINCT la.autor SEPARATOR ', ') AS autor,
                 CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen
             FROM libros l
             JOIN ejemplares e ON l.isbn = e.isbn
             LEFT JOIN libro_autor la ON l.isbn = la.isbn
-            LEFT JOIN autores a ON la.id_autor = a.id_autor
             GROUP BY l.isbn, l.titulo, e.estado
         """)
         
