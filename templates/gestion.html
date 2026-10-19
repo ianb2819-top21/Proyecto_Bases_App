@@ -1,0 +1,576 @@
+
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+  .gestion-wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+    color: #f8fafc;
+  }
+
+  .gestion-wrap * {
+    box-sizing: border-box;
+  }
+
+  .gestion-wrap h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+    color: #fff;
+  }
+
+  .gestion-subtitulo {
+    color: #94a3b8;
+    font-size: 1.1rem;
+    margin: 0 0 2.5rem;
+  }
+
+  /* Tarjetas principales */
+  .gestion-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 15px;
+    padding: 28px;
+    margin-bottom: 28px;
+  }
+
+  .gestion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .gestion-header h2 {
+    color: #fff;
+    font-size: 1.5rem;
+    margin: 0;
+  }
+
+  /* Botones */
+  .gestion-btn {
+    display: inline-block;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    color: #fff !important;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  .gestion-btn:hover {
+    filter: brightness(1.12);
+  }
+
+  .gestion-btn-crear {
+    background: #2563eb;
+  }
+
+  .gestion-btn-editar {
+    background: #475569;
+  }
+
+  .gestion-btn-ejemplares {
+    background: #0369a1;
+  }
+
+  .gestion-btn-borrar,
+  .gestion-btn-bloquear {
+    background: #991b1b;
+  }
+
+  .gestion-btn-activar {
+    background: #15803d;
+  }
+
+  .gestion-btn-guardar {
+    background: #16a34a;
+  }
+
+  /* Tablas */
+  .gestion-tabla-contenedor {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .gestion-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    color: #f8fafc;
+  }
+
+  .gestion-tabla th {
+    text-align: left;
+    padding: 16px;
+    color: #94a3b8;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-bottom: 1px solid #475569;
+    background: transparent;
+  }
+
+  .gestion-tabla td {
+    padding: 16px;
+    border-bottom: 1px solid #334155;
+    vertical-align: middle;
+    color: #f8fafc;
+  }
+
+  .gestion-tabla tr:last-child td {
+    border-bottom: none;
+  }
+
+  .gestion-tabla tbody tr:hover {
+    background: rgba(148, 163, 184, 0.06);
+  }
+
+  .gestion-titulo-libro {
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .gestion-isbn {
+    color: #94a3b8;
+    font-size: 0.9rem;
+  }
+
+  .gestion-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .gestion-acciones form {
+    margin: 0;
+  }
+
+  /* Formulario de usuario */
+  .gestion-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+
+  .gestion-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .gestion-campo label {
+    color: #cbd5e1;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  .gestion-campo input,
+  .gestion-campo select {
+    width: 100%;
+    padding: 13px 15px;
+    background: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+  }
+
+  .gestion-campo input:focus,
+  .gestion-campo select:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56,189,248,0.15);
+  }
+
+  .gestion-form-footer {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  /* Etiquetas de estado */
+  .gestion-badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .gestion-activo {
+    background: #166534;
+    color: #dcfce7;
+  }
+
+  .gestion-bloqueado {
+    background: #7f1d1d;
+    color: #fee2e2;
+  }
+
+  .gestion-neutral {
+    background: #334155;
+    color: #e2e8f0;
+  }
+
+  /* Mensajes de Flask */
+  .gestion-wrap .flash {
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    color: #fff;
+  }
+
+  .gestion-wrap .flash.ok,
+  .gestion-wrap .flash.success {
+    background: #166534;
+  }
+
+  .gestion-wrap .flash.error {
+    background: #991b1b;
+  }
+
+  .gestion-wrap .flash.warn,
+  .gestion-wrap .flash.warning {
+    background: #92400e;
+  }
+
+  .gestion-vacio {
+    color: #94a3b8;
+    padding: 20px 0;
+    font-style: italic;
+  }
+
+  /* Diseño adaptable */
+  @media (max-width: 768px) {
+    .gestion-wrap h1 {
+      font-size: 2rem;
+    }
+
+    .gestion-card {
+      padding: 20px;
+    }
+
+    .gestion-form {
+      grid-template-columns: 1fr;
+    }
+
+    .gestion-form-footer {
+      grid-column: 1;
+    }
+
+    .gestion-form-footer button {
+      width: 100%;
+    }
+
+    .gestion-tabla {
+      min-width: 650px;
+    }
+  }
+</style>
+
+<div class="gestion-wrap">
+
+  <!-- ENCABEZADO -->
+  <h1>Gestión BD — Usuarios y Libros</h1>
+
+  <p class="gestion-subtitulo">
+    Administra los libros, ejemplares y usuarios
+    registrados en la biblioteca.
+  </p>
+
+  <!-- MENSAJES -->
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% for tipo, mensaje in mensajes %}
+      <p class="flash {{ tipo }}">{{ mensaje }}</p>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- SECCIÓN LIBROS -->
+  <section class="gestion-card">
+
+    <div class="gestion-header">
+      <h2>Libros</h2>
+
+      <a href="{{ url_for('libro_form') }}"
+         class="gestion-btn gestion-btn-crear">
+        + Nuevo libro
+      </a>
+    </div>
+
+    {% if libros %}
+
+    <div class="gestion-tabla-contenedor">
+      <table class="gestion-tabla">
+
+        <thead>
+          <tr>
+            <th>ISBN</th>
+            <th>Título</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for l in libros %}
+          <tr>
+
+            <td class="gestion-isbn">
+              {{ l.isbn }}
+            </td>
+
+            <td>
+              <span class="gestion-titulo-libro">
+                {{ l.titulo }}
+              </span>
+            </td>
+
+            <td>
+              <div class="gestion-acciones">
+
+                <!-- EDITAR -->
+                <a href="{{ url_for('libro_form', isbn=l.isbn) }}"
+                   class="gestion-btn gestion-btn-editar">
+                  Editar
+                </a>
+
+                <!-- GESTIONAR EJEMPLARES -->
+                <a href="{{ url_for('gestionar_ejemplares', isbn=l.isbn) }}"
+                   class="gestion-btn gestion-btn-ejemplares">
+                  Ejemplares / estados
+                </a>
+
+                <!-- BORRAR -->
+                <form method="post"
+                      action="{{ url_for('borrar_libro', isbn=l.isbn) }}"
+                      onsubmit="return confirm('¿Eliminar libro?');">
+
+                  <input type="hidden"
+                         name="_csrf"
+                         value="{{ csrf_token() }}">
+
+                  <button type="submit"
+                          class="gestion-btn gestion-btn-borrar">
+                    Borrar
+                  </button>
+                </form>
+
+              </div>
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
+
+    {% else %}
+      <p class="gestion-vacio">
+        No hay libros registrados.
+      </p>
+    {% endif %}
+
+  </section>
+
+  <!-- SECCIÓN CREAR USUARIO -->
+  <section class="gestion-card">
+
+    <div class="gestion-header">
+      <h2>Crear usuario</h2>
+    </div>
+
+    <form class="gestion-form"
+          method="post"
+          action="{{ url_for('crear_usuario') }}">
+
+      <input type="hidden"
+             name="_csrf"
+             value="{{ csrf_token() }}">
+
+      <div class="gestion-campo">
+        <label for="codigo">Código</label>
+        <input id="codigo"
+               name="codigo"
+               required
+               maxlength="20"
+               placeholder="Código del usuario">
+      </div>
+
+      <div class="gestion-campo">
+        <label for="identificacion">
+          Identificación (clave de acceso actual)
+        </label>
+        <input id="identificacion"
+               name="identificacion"
+               required
+               maxlength="20"
+               placeholder="Número de identificación">
+      </div>
+
+      <div class="gestion-campo">
+        <label for="nombres">Nombre completo</label>
+        <input id="nombres"
+               name="nombres"
+               required
+               maxlength="150"
+               placeholder="Nombre del usuario">
+      </div>
+
+      <div class="gestion-campo">
+        <label for="correo">Correo electrónico</label>
+        <input id="correo"
+               name="correo"
+               type="email"
+               required
+               maxlength="150"
+               placeholder="correo@ejemplo.com">
+      </div>
+
+      <div class="gestion-campo">
+        <label for="carrera">Carrera</label>
+        <input id="carrera"
+               name="carrera"
+               maxlength="150"
+               placeholder="Carrera del usuario">
+      </div>
+
+      <div class="gestion-campo">
+        <label for="rol">Rol</label>
+        <select id="rol" name="rol">
+          <option value="estudiante">Estudiante</option>
+          <option value="docente">Docente</option>
+          <option value="bibliotecario">Bibliotecario</option>
+          <option value="administrador">Administrador</option>
+        </select>
+      </div>
+
+      <div class="gestion-form-footer">
+        <button type="submit"
+                class="gestion-btn gestion-btn-guardar">
+          Crear usuario
+        </button>
+      </div>
+
+    </form>
+
+  </section>
+
+  <!-- SECCIÓN USUARIOS -->
+  <section class="gestion-card">
+
+    <div class="gestion-header">
+      <h2>Usuarios registrados</h2>
+
+      <span class="gestion-badge gestion-neutral">
+        {{ usuarios | length }} usuarios
+      </span>
+    </div>
+
+    {% if usuarios %}
+
+    <div class="gestion-tabla-contenedor">
+      <table class="gestion-tabla">
+
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for u in usuarios %}
+          <tr>
+
+            <td class="gestion-isbn">
+              {{ u.codigo }}
+            </td>
+
+            <td>
+              <span class="gestion-titulo-libro">
+                {{ u.nombres }}
+              </span>
+            </td>
+
+            <td>
+              {{ u.rol | capitalize }}
+            </td>
+
+            <td>
+              {% if u.estado | lower == 'activo' %}
+                <span class="gestion-badge gestion-activo">
+                  Activo
+                </span>
+              {% elif u.estado | lower == 'bloqueado' %}
+                <span class="gestion-badge gestion-bloqueado">
+                  Bloqueado
+                </span>
+              {% else %}
+                <span class="gestion-badge gestion-neutral">
+                  {{ u.estado }}
+                </span>
+              {% endif %}
+            </td>
+
+            <td>
+              <form method="post"
+                    action="{{ url_for('estado_usuario', codigo=u.codigo) }}">
+
+                <input type="hidden"
+                       name="_csrf"
+                       value="{{ csrf_token() }}">
+
+                <input type="hidden"
+                       name="estado"
+                       value="{{ 'Bloqueado' if u.estado|lower == 'activo' else 'Activo' }}">
+
+                {% if u.estado | lower == 'activo' %}
+
+                  <button type="submit"
+                          class="gestion-btn gestion-btn-bloquear">
+                    Bloquear
+                  </button>
+
+                {% else %}
+
+                  <button type="submit"
+                          class="gestion-btn gestion-btn-activar">
+                    Activar
+                  </button>
+
+                {% endif %}
+
+              </form>
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
+
+    {% else %}
+      <p class="gestion-vacio">
+        No hay usuarios registrados.
+      </p>
+    {% endif %}
+
+  </section>
+
+</div>
+
+{% endblock %}

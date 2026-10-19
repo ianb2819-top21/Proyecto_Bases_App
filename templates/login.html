@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - BiblioUninorte</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-icon">📚</div>
+
+            <h1>Bienvenido a BiblioUninorte</h1>
+            <p>Ingresa tus credenciales institucionales</p>
+
+            {% if error %}
+                <div class="login-error">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('login') }}">
+                <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                <div class="login-field">
+                    <label for="codigo">Código institucional</label>
+                    <input type="text" id="codigo" name="codigo"
+                           placeholder="Ej: U001" required>
+                </div>
+
+                <div class="login-field">
+                    <label for="identificacion">Clave de acceso</label>
+                    <input type="password" id="identificacion"
+                           name="identificacion" required>
+                </div>
+
+                <button type="submit" class="login-button">
+                    Iniciar sesión
+                </button>
+            </form>
+
+            <p class="login-register">
+                ¿No tienes cuenta? Registro próximamente
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>

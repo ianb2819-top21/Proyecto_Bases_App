@@ -2,8 +2,10 @@ import os
 import traceback
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from urllib.parse import urlparse
 from dotenv import load_dotenv
+import pymysql
+from pymysql.cursors import DictCursor
+from urllib.parse import urlparse
 
 # 1. INTERFAZ COMÚN
 class BaseDatos(ABC):
@@ -11,11 +13,11 @@ class BaseDatos(ABC):
 
     @abstractmethod
     def consultar(self, sql, params=()):
-        """SELECT: devuelve una lista de diccionarios."""
+        pass
 
     @abstractmethod
     def ejecutar(self, sql, params=()):
-        """INSERT/UPDATE/DELETE: devuelve filas afectadas."""
+        pass
 
     @abstractmethod
     def cerrar(self):
@@ -30,7 +32,6 @@ class BaseDatos(ABC):
         pass
 
     def _confirmar(self):
-        """Hace commit solo si NO estamos dentro de una transacción."""
         if not self._en_transaccion:
             self._commit()
 
@@ -54,28 +55,25 @@ class BaseDatos(ABC):
     def __exit__(self, *args):
         self.cerrar()
 
+# 2. MOTOR MYSQL LOCAL (LIMPIO)
 class MySQLDB(BaseDatos):
     def __init__(self, url):
-        import pymysql
-        from pymysql.cursors import DictCursor
-        
-        # Limpieza de la URL en caso de que venga con formato de bytes
+        # Desarmamos tu DATABASE_URL para extraer el root y la contraseña
         if isinstance(url, bytes):
             url = url.decode("utf-8")
 
         u = urlparse(url)
         nombre_bd = u.path.lstrip("/")
-    
-        # CONEXIÓN PERMANENTE BLINDADA (Sin instalador temporal y con SSL)
+
+        # Conexión directa a tu MySQL Workbench local
         self.conn = pymysql.connect(
-            host=u.hostname,
+            host=u.hostname or "localhost",
             port=u.port or 3306,
-            user=u.username,
-            password=u.password,
+            user=u.username or "root",
+            password=u.password or "",
             database=nombre_bd,
             charset="utf8mb4",
-            cursorclass=DictCursor,
-            ssl={} # <- EL ESCUDO CONTRA EL BUG DE BYTES
+            cursorclass=DictCursor
         )
 
     def consultar(self, sql, params=()):
@@ -100,18 +98,19 @@ class MySQLDB(BaseDatos):
 
     def cerrar(self):
         self.conn.close()
-        
+
+# 3. PUENTE DE CONEXIÓN
 def crear_db(url=None):
     try:
         load_dotenv()
         url = url or os.getenv("DATABASE_URL")
-
+        
         if not url:
             raise ValueError("No se encontró DATABASE_URL en el archivo .env")
 
-        print("Intentando conectar con MySQL en la nube...")
+        print("Intentando conectar con MySQL Local...")
         db = MySQLDB(url)
-        print("Conexión con MySQL exitosa")
+        print("Conexión con MySQL Local exitosa")
         return db
 
     except Exception as e:

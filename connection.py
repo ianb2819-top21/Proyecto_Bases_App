@@ -17,13 +17,16 @@ La aplicación debe permitir:
 •	Registrar usuarios con datos mínimos: código, identificación, nombres, correo, rol (estudiante/docente), carrera (opcional), estado (activo/bloqueado).
 •	Consultar historial de préstamos por usuario. '''
 
-def registrar_usuario(codigo, identificacion, nombres, correo, rol, carrera=None, estado="activo"):
+def registrar_usuario(codigo, identificacion, nombres, correo, rol, carrera=None, estado="Activo"):
     with crear_db() as db:
-        db.ejecutar(
-            "INSERT INTO usuarios (identificacion, nombres, correo, rol, carrera, estado) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (identificacion, nombres, correo, rol, carrera, estado)
-        )
+        with db.transaccion():
+            db.ejecutar("""
+                INSERT INTO usuarios (codigo, identificacion, nombres, correo, rol, carrera, estado)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (codigo, identificacion, nombres, correo, rol, carrera, estado))
+            if rol.lower() == 'administrador':
+                db.ejecutar('INSERT INTO usuario_admin (codigo) VALUES (?)', (codigo,))
+
 
 def consultar_historial_prestamos_por_usuario(codigo):
     """Préstamos del usuario con título y estado derivado de las fechas reales.
@@ -105,78 +108,84 @@ La aplicación debe permitir:
 •	Registrar observaciones del ejemplar al devolver: “dañado”, “páginas faltantes”.
 '''
 
-def registrar_devolucion(codigo_ejemplar, codigo_usuario, observaciones=None):
+TARIFA_MULTA_DIARIA = 2000  # COP por día de retraso
+
+
+def _a_fecha(valor):
+    """Normaliza date/datetime/str a date (o None)."""
+    from datetime import date, datetime as _dt
+    if valor is None:
+        return None
+    if isinstance(valor, _dt):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
+    return date.fromisoformat(str(valor)[:10])
+
+
+def registrar_devolucion(id_ejemplar, observaciones=None):
+    from datetime import date
+    hoy = date.today()
     with crear_db() as db:
-        # Actualizar estado del ejemplar a disponible
-        db.ejecutar(
-            "UPDATE ejemplares SET estado = 'disponible' WHERE codigo = ?",
-            (codigo_ejemplar,)
-        )
-        
-        # Registrar la devolución en la tabla de devoluciones
-        db.ejecutar(
-            "INSERT INTO devoluciones (codigo_ejemplar, codigo_usuario, fecha_devolucion, observaciones) "
-            "VALUES (?, ?, CURRENT_TIMESTAMP, ?)",
-            (codigo_ejemplar, codigo_usuario, observaciones)
-        )
-        
-        # Calcular sanción/multa si hay retraso
-        prestamo = db.consultar(
-            "SELECT fecha_prestamo FROM prestamos WHERE codigo_ejemplar = ? AND codigo_usuario = ?",
-            (codigo_ejemplar, codigo_usuario)
-        )
-        
-        if prestamo:
-            fecha_prestamo = prestamo[0]['fecha_prestamo']
-            # Aquí se puede implementar la lógica para calcular la sanción/multa según la política de la biblioteca
-            tarifa = 2000  # Ejemplo: $2000 pesos por día de retraso
-            dias_retraso = (datetime.now() - fecha_prestamo).days - 7  # Suponiendo un período de préstamo de 7 días
-            if dias_retraso > 0:    
-                multa = dias_retraso * tarifa
-                db.ejecutar(
-                    "UPDATE usuarios SET saldo_multa = saldo_multa + ? WHERE codigo = ?",
-                    (multa, codigo_usuario)
-                )
-                        
-        # Actualizar prestamo para reflejar que el ejemplar ha sido devuelto
-        db.ejecutar(
-            "UPDATE prestamos SET fecha_devolucion = CURRENT_TIMESTAMP WHERE codigo_ejemplar = ? AND codigo_usuario = ?",
-            (codigo_ejemplar, codigo_usuario)
-        )
-        
-        
-''' 5.	Reportes y consultas
-El personal bibliotecario debe poder ver:
-•	Préstamos activos y vencidos.
-•	Libros más prestados por periodo.
-•	Usuarios con más préstamos.
-•	Inventario por estado (disponibles, prestados, perdidos).
-'''
+        with db.transaccion():
+            ejemplares = db.consultar(
+                "SELECT estado FROM ejemplares WHERE id_ejemplar = ? FOR UPDATE",
+                (id_ejemplar,))
+            if not ejemplares or str(ejemplares[0]['estado']).lower() != 'prestado':
+                raise ValueError('El ejemplar no está marcado como prestado.')
+            prestamos = db.consultar("""
+                SELECT codigo_usuario, fec_prestamo, fec_vencimiento
+                FROM prestamos WHERE id_ejemplar = ? AND fec_devolucion IS NULL
+                AND LOWER(estado) IN ('activo', 'aprobado') FOR UPDATE
+            """, (id_ejemplar,))
+            if len(prestamos) != 1:
+                raise ValueError('Debe existir exactamente un préstamo activo del ejemplar.')
+            prestamo = prestamos[0]
+            vence = _a_fecha(prestamo['fec_vencimiento'])
+            retraso = max((hoy - vence).days, 0) if vence else 0
+            multa = retraso * TARIFA_MULTA_DIARIA
+            filas = db.ejecutar("""
+                UPDATE prestamos SET fec_devolucion = ?, observaciones = ?,
+                       estado = 'devuelto', sancion = ?
+                WHERE id_ejemplar = ? AND codigo_usuario = ? AND fec_prestamo = ?
+                  AND fec_devolucion IS NULL
+            """, (hoy, observaciones or None, multa, id_ejemplar,
+                  prestamo['codigo_usuario'], prestamo['fec_prestamo']))
+            if filas != 1:
+                raise ValueError('No se pudo actualizar el préstamo.')
+            if db.ejecutar("UPDATE ejemplares SET estado = 'Disponible' WHERE id_ejemplar = ?",
+                          (id_ejemplar,)) != 1:
+                raise ValueError('No se pudo actualizar el ejemplar.')
+    return {'codigo_usuario': prestamo['codigo_usuario'], 'dias_retraso': retraso, 'multa': multa}
 
 def obtener_prestamos_activos_y_vencidos():
     with crear_db() as db:
-        prestamos = db.consultar(
-            "SELECT * FROM prestamos WHERE fecha_devolucion IS NULL"
-        )
-        vencidos = []
-        for prestamo in prestamos:
-            fecha_prestamo = prestamo['fecha_prestamo']
-            dias_transcurridos = (datetime.now() - fecha_prestamo).days
-            if dias_transcurridos > 7:  # Suponiendo un período de préstamo de 7 días
-                vencidos.append(prestamo)
-        return {'activos': prestamos, 'vencidos': vencidos}
-    
+        activos = db.consultar("""
+            SELECT p.*, l.titulo, u.nombres
+            FROM prestamos p JOIN ejemplares e ON e.id_ejemplar = p.id_ejemplar
+            JOIN libros l ON l.isbn = e.isbn
+            JOIN usuarios u ON u.codigo = p.codigo_usuario
+            WHERE p.fec_devolucion IS NULL AND LOWER(p.estado) IN ('activo', 'aprobado')
+            ORDER BY p.fec_vencimiento
+        """)
+    from datetime import date
+    return {'activos': activos,
+            'vencidos': [p for p in activos if _a_fecha(p['fec_vencimiento'])
+                         and _a_fecha(p['fec_vencimiento']) < date.today()]}
+
+
 def obtener_libros_mas_prestados_por_periodo(fecha_inicio, fecha_fin):
     with crear_db() as db:
-        return db.consultar(
-            "SELECT codigo_libro, COUNT(*) AS cantidad_prestamos "
-            "FROM prestamos "
-            "WHERE fecha_prestamo BETWEEN ? AND ? "
-            "GROUP BY codigo_libro "
-            "ORDER BY cantidad_prestamos DESC",
-            (fecha_inicio, fecha_fin)
-        )
-        
+        return db.consultar("""
+            SELECT l.isbn, l.titulo, COUNT(*) AS cantidad_prestamos
+            FROM prestamos p JOIN ejemplares e ON e.id_ejemplar = p.id_ejemplar
+            JOIN libros l ON l.isbn = e.isbn
+            WHERE p.fec_prestamo BETWEEN ? AND ?
+              AND LOWER(p.estado) <> 'rechazado'
+            GROUP BY l.isbn, l.titulo ORDER BY cantidad_prestamos DESC
+        """, (fecha_inicio, fecha_fin))
+
+
 def obtener_usuarios_con_mas_prestamos():
     with crear_db() as db:
         return db.consultar(
@@ -206,32 +215,24 @@ La aplicación debe enviar notificaciones a los usuarios sobre:
 '''
 
 def obtener_prestamos_proximos_a_vencer():
+    from datetime import date, timedelta
     with crear_db() as db:
-        prestamos = db.consultar(
-            "SELECT * FROM prestamos WHERE fecha_devolucion IS NULL"
-        )
-        proximos_a_vencer = []
-        for prestamo in prestamos:
-            fecha_prestamo = prestamo['fecha_prestamo']
-            dias_transcurridos = (datetime.now() - fecha_prestamo).days
-            if 5 <= dias_transcurridos <= 7:  # Suponiendo un período de préstamo de 7 días
-                proximos_a_vencer.append(prestamo)
-        return proximos_a_vencer
+        return db.consultar("""
+            SELECT * FROM prestamos WHERE fec_devolucion IS NULL
+              AND LOWER(estado) IN ('activo', 'aprobado')
+              AND fec_vencimiento BETWEEN ? AND ?
+        """, (date.today(), date.today() + timedelta(days=3)))
+
 
 def obtener_prestamos_vencidos():
+    from datetime import date
     with crear_db() as db:
-        prestamos = db.consultar(
-            "SELECT * FROM prestamos WHERE fecha_devolucion IS NULL"
-        )
-        vencidos = []
-        for prestamo in prestamos:
-            fecha_prestamo = prestamo['fecha_prestamo']
-            dias_transcurridos = (datetime.now() - fecha_prestamo).days
-            if dias_transcurridos > 7:  # Suponiendo un período de préstamo de 7 días
-                vencidos.append(prestamo)
-        return vencidos
-    
-'''Debe existir un usuario administrador o bibliotecario que se encargara de realizar la aprobación del préstamo y la devolución del libro.'''
+        return db.consultar("""
+            SELECT * FROM prestamos WHERE fec_devolucion IS NULL
+              AND LOWER(estado) IN ('activo', 'aprobado')
+              AND fec_vencimiento < ?
+        """, (date.today(),))
+
 
 def obtener_usuarios_administradores():
     with crear_db() as db:
@@ -241,56 +242,96 @@ def obtener_usuarios_administradores():
         
 '''El usuario busca el libro y solicita el préstamo el cual debe ser aprobado por el administrador.'''
 
-def solicitar_prestamo(codigo_ejemplar, codigo_usuario):
+def solicitar_prestamo(id_ejemplar, codigo_usuario):
+    from datetime import date
     with crear_db() as db:
-        # Verificar si el ejemplar está disponible
-        ejemplar = db.consultar(
-            "SELECT estado FROM ejemplares WHERE codigo = ?",
-            (codigo_ejemplar,)
-        )
-        if not ejemplar or ejemplar[0]['estado'] != 'disponible':
-            raise ValueError("El ejemplar no está disponible para préstamo.")
-        
-        # Registrar la solicitud de préstamo (pendiente de aprobación)
-        db.ejecutar(
-            "INSERT INTO prestamos (codigo_ejemplar, codigo_usuario, fecha_prestamo, estado) "
-            "VALUES (?, ?, CURRENT_TIMESTAMP, 'pendiente')",
-            (codigo_ejemplar, codigo_usuario)
-        )
-        
-def aprobar_prestamo(codigo_prestamo):
+        with db.transaccion():
+            ej = db.consultar(
+                'SELECT estado FROM ejemplares WHERE id_ejemplar = ? FOR UPDATE',
+                (id_ejemplar,))
+            if not ej or str(ej[0]['estado']).lower() != 'disponible':
+                raise ValueError('El ejemplar no está disponible.')
+            existe = db.consultar("""
+                SELECT id_ejemplar FROM prestamos
+                WHERE id_ejemplar = ? AND fec_devolucion IS NULL
+                  AND LOWER(estado) IN ('pendiente', 'aprobado', 'activo')
+            """, (id_ejemplar,))
+            if existe:
+                raise ValueError('El ejemplar ya tiene un préstamo o solicitud activa.')
+            db.ejecutar("""
+                INSERT INTO prestamos
+                (id_ejemplar, codigo_usuario, fec_prestamo, estado, sancion)
+                VALUES (?, ?, ?, 'pendiente', 0)
+            """, (id_ejemplar, codigo_usuario, date.today()))
+    return True
+
+
+def aprobar_prestamo(id_ejemplar, codigo_usuario):
+    from datetime import date, timedelta
     with crear_db() as db:
-        # Actualizar el estado del préstamo a aprobado
-        db.ejecutar(
-            "UPDATE prestamos SET estado = 'aprobado' WHERE codigo = ?",
-            (codigo_prestamo,)
-        )
+        with db.transaccion():
+            ej = db.consultar(
+                'SELECT estado FROM ejemplares WHERE id_ejemplar = ? FOR UPDATE',
+                (id_ejemplar,))
+            if not ej or str(ej[0]['estado']).lower() != 'disponible':
+                raise ValueError('El ejemplar no está disponible.')
+            pendientes = db.consultar("""
+                SELECT fec_prestamo FROM prestamos
+                WHERE id_ejemplar = ? AND codigo_usuario = ?
+                  AND LOWER(estado) = 'pendiente' AND fec_devolucion IS NULL
+                FOR UPDATE
+            """, (id_ejemplar, codigo_usuario))
+            if len(pendientes) != 1:
+                raise ValueError('No se encontró una única solicitud pendiente.')
+            filas = db.ejecutar("""
+                UPDATE prestamos SET estado = 'aprobado',
+                    fec_vencimiento = COALESCE(fec_vencimiento, ?)
+                WHERE id_ejemplar = ? AND codigo_usuario = ? AND fec_prestamo = ?
+                  AND LOWER(estado) = 'pendiente'
+            """, (date.today() + timedelta(days=7), id_ejemplar,
+                  codigo_usuario, pendientes[0]['fec_prestamo']))
+            if filas != 1:
+                raise ValueError('No se pudo aprobar el préstamo.')
+            if db.ejecutar(
+                "UPDATE ejemplares SET estado = 'Prestado' WHERE id_ejemplar = ?",
+                (id_ejemplar,)) != 1:
+                raise ValueError('No se pudo actualizar el ejemplar.')
+    return True
+
+def rechazar_prestamo(id_ejemplar, codigo_usuario):
         
-        # Actualizar el estado del ejemplar a prestado
-        prestamo = db.consultar(
-            "SELECT codigo_ejemplar FROM prestamos WHERE codigo = ?",
-            (codigo_prestamo,)
-        )
-        if prestamo:
-            codigo_ejemplar = prestamo[0]['codigo_ejemplar']
-            db.ejecutar(
-                "UPDATE ejemplares SET estado = 'prestado' WHERE codigo = ?",
-                (codigo_ejemplar,)
-            )
-            
-def rechazar_prestamo(codigo_prestamo):
     with crear_db() as db:
-        # Actualizar el estado del préstamo a rechazado
+      
         db.ejecutar(
-            "UPDATE prestamos SET estado = 'rechazado' WHERE codigo = ?",
-            (codigo_prestamo,)
+            "UPDATE prestamos SET estado = 'rechazado' "
+            "WHERE id_ejemplar = ? AND codigo_usuario = ? AND estado = 'pendiente'",
+            (id_ejemplar, codigo_usuario)
         )
         
 def obtener_prestamos_pendientes():
     with crear_db() as db:
-        return db.consultar(
-            "SELECT * FROM prestamos WHERE estado = 'pendiente'"
-        )
+        return db.consultar("""
+            SELECT p.id_ejemplar, p.codigo_usuario, p.fec_prestamo,
+                   l.titulo, u.nombres AS usuario
+            FROM prestamos AS p
+            JOIN ejemplares AS e ON e.id_ejemplar = p.id_ejemplar
+            JOIN libros AS l ON l.isbn = e.isbn
+            LEFT JOIN usuarios AS u ON u.codigo = p.codigo_usuario
+            WHERE p.estado = 'pendiente'
+            ORDER BY p.fec_prestamo
+        """)
+
+
+def obtener_inventario_admin():
+    """Todos los ejemplares con su título (para el panel de administración)."""
+    with crear_db() as db:
+        return db.consultar("""
+            SELECT e.id_ejemplar, e.estado, l.isbn, l.titulo
+            FROM ejemplares AS e
+            JOIN libros AS l ON l.isbn = e.isbn
+            ORDER BY l.titulo, e.id_ejemplar
+        """)
+
         
 def obtener_prestamos_aprobados():
     with crear_db() as db:
@@ -307,17 +348,19 @@ def obtener_prestamos_rechazados():
 '''Seguridad y autenticación
 La aplicación debe implementar un sistema de autenticación para los usuarios, asegurando que solo los usuarios registrados puedan acceder a las funcionalidades de la aplicación. Se debe utilizar un mecanismo de inicio de sesión con credenciales (usuario y contraseña) y, opcionalmente, se puede implementar autenticación basada en tokens para mayor seguridad.'''
 
-def autenticar_usuario(codigo, correo):
+def autenticar_usuario(codigo, identificacion):
     with crear_db() as db:
-        usuario = db.consultar(
-            # ¡Cambio vital: Ahora SQL busca la columna 'correo' real!
-            "SELECT * FROM usuarios WHERE codigo = ? AND correo = ?",
-            (codigo, correo)
+        usuarios = db.consultar(
+            """
+            SELECT codigo, identificacion, nombres,
+                   correo, estado, rol
+            FROM usuarios
+            WHERE codigo = ? AND identificacion = ?
+            """,
+            (codigo, identificacion)
         )
-        if usuario:
-            return usuario[0]  # Retornamos el diccionario con los datos del usuario
-        else:
-            return None  # Autenticación fallida
+
+        return usuarios[0] if usuarios else None
             
 def bloquear_usuario(codigo):
     with crear_db() as db:
@@ -487,22 +530,43 @@ def obtener_usuarios_por_codigo(codigo):
             (codigo,)
         )
 
+
 def obtener_catalogo_web():
-    from db import crear_db
+    """Muestra todos los títulos aunque no haya copias disponibles."""
     with crear_db() as db:
         return db.consultar("""
-            SELECT 
-                l.isbn, 
-                l.titulo, 
-                'Ingeniería / Tecnología' AS categoria, 
-                e.estado,
-                GROUP_CONCAT(DISTINCT a.nombre SEPARATOR ', ') AS autor,
-                CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen
-            FROM libros l
-            JOIN ejemplares e ON l.isbn = e.isbn
-            LEFT JOIN libro_autor la ON l.isbn = la.isbn
-            LEFT JOIN autores a ON la.id_autor = a.id_autor
-            GROUP BY l.isbn, l.titulo, e.estado
+            SELECT l.isbn, l.titulo,
+                COALESCE((SELECT GROUP_CONCAT(categoria SEPARATOR ', ')
+                  FROM libro_categoria WHERE isbn = l.isbn), 'Sin categoría') AS categoria,
+                COALESCE((SELECT GROUP_CONCAT(autor SEPARATOR ', ')
+                  FROM libro_autor WHERE isbn = l.isbn), 'Sin autor') AS autor,
+                (SELECT COUNT(*) FROM ejemplares e WHERE e.isbn = l.isbn) AS total_ejemplares,
+                (SELECT COUNT(*) FROM ejemplares e WHERE e.isbn = l.isbn
+                 AND LOWER(e.estado) = 'disponible') AS disponibles,
+                CASE WHEN EXISTS (SELECT 1 FROM ejemplares e WHERE e.isbn = l.isbn
+                      AND LOWER(e.estado) = 'disponible')
+                     THEN 'Disponible' ELSE 'No disponible' END AS estado,
+                CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen,
+                (SELECT MIN(e.id_ejemplar) FROM ejemplares e
+                 WHERE e.isbn = l.isbn AND LOWER(e.estado) = 'disponible') AS id_disponible
+            FROM libros l ORDER BY l.titulo
         """)
+
+
+def buscar_usuario_por_codigo(codigo):
+    """Busca un usuario por su código institucional."""
+    from db import crear_db
+
+    with crear_db() as db:
+        usuarios = db.consultar("""
+            SELECT codigo, identificacion, nombres,
+                   correo, carrera, estado, rol
+            FROM usuarios
+            WHERE codigo = ?
+            LIMIT 1
+        """, (codigo,))
+
+    return usuarios[0] if usuarios else None
+
         
         

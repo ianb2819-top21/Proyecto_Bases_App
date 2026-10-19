@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Ejemplares — {{ libro.titulo }}</h1>
+<p>ISBN: {{ libro.isbn }} · Total registrado: {{ ejemplares|length }}</p>
+{% with mensajes = get_flashed_messages(with_categories=true) %}
+{% for tipo, mensaje in mensajes %}<p class="flash {{ tipo }}">{{ mensaje }}</p>{% endfor %}
+{% endwith %}
+<section class="gestion-ejemplares">
+<h2>Editar cantidad total</h2>
+<p>Al aumentar se crean nuevas copias disponibles. Al reducir solo se eliminan copias disponibles que nunca hayan tenido préstamos.</p>
+<form method="post" action="{{ url_for('editar_cantidad_ejemplares', isbn=libro.isbn) }}" class="form-admin">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<label>Cantidad total de ejemplares <input type="number" name="cantidad" min="0" max="10000" required value="{{ ejemplares|length }}"></label>
+<button type="submit">Guardar cantidad</button>
+</form>
+<h2>Editar estado de cada ejemplar</h2>
+<p>El estado <strong>Prestado</strong> se gestiona desde Aprobar / Devolver, no manualmente.</p>
+<div class="tabla-scroll"><table><thead><tr><th>ID</th><th>Sala</th><th>Estante</th><th>Estado actual</th><th>Nuevo estado</th></tr></thead><tbody>
+{% for e in ejemplares %}
+<tr><td>{{ e.id_ejemplar }}</td><td>{{ e.sala or '—' }}</td><td>{{ e.estante or '—' }}</td><td>{{ e.estado }}</td>
+<td>{% if e.comprometido or e.estado|lower == 'prestado' %}
+<span>No editable (préstamo/solicitud vigente)</span>
+{% else %}
+<form method="post" action="{{ url_for('editar_estado_ejemplar', isbn=libro.isbn, id_ejemplar=e.id_ejemplar) }}" class="inline-form">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<select name="estado" aria-label="Nuevo estado del ejemplar {{ e.id_ejemplar }}">
+{% for estado in estados %}<option value="{{ estado }}" {{ 'selected' if estado|lower == e.estado|lower else '' }}>{{ estado }}</option>{% endfor %}
+</select><button type="submit">Cambiar estado</button></form>
+{% endif %}</td></tr>
+{% else %}<tr><td colspan="5">Este libro todavía no tiene ejemplares.</td></tr>{% endfor %}
+</tbody></table></div>
+<p style="margin-top:1rem"><a href="{{ url_for('gestion') }}">← Volver a gestión</a> · <a href="{{ url_for('catalogo') }}">Ver catálogo</a></p>
+</section>
+{% endblock %}
