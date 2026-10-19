@@ -1,4 +1,5 @@
-from flask import Flask, render_template, session, redirect, url_for, abort
+from flask import (Flask, render_template, session, redirect, url_for, abort,
+                   request, flash)
 import connection # Tu archivo de lógica de negocio
 
 app = Flask(__name__)
@@ -67,6 +68,67 @@ def cambiar_rol(nuevo_rol):
         session['rol'] = nuevo_rol
         session['nombre'] = f"Modo: {nuevo_rol.capitalize()}"
     return redirect(url_for('catalogo'))
+
+
+# ---------------------------------------------------------------------------
+# PANEL DE ADMINISTRACIÓN (solo bibliotecario / administrador)
+# ---------------------------------------------------------------------------
+ROLES_STAFF = ('bibliotecario', 'administrador')
+
+
+def _exigir_staff():
+    """Candado de seguridad: sin rol de staff -> 403."""
+    if session.get('rol') not in ROLES_STAFF:
+        abort(403)
+
+
+@app.route('/panel-admin')
+def panel_admin():
+    _exigir_staff()
+    try:
+        pendientes = connection.obtener_prestamos_pendientes()
+        inventario = connection.obtener_inventario_admin()
+    except Exception:
+        app.logger.exception('No se pudo cargar el panel de administración')
+        flash('No fue posible cargar los datos del panel.', 'error')
+        pendientes, inventario = [], []
+    return render_template('admin_panel.html', pendientes=pendientes,
+                           inventario=inventario)
+
+
+@app.route('/panel-admin/aprobar', methods=['POST'])
+def aprobar():
+    _exigir_staff()
+    try:
+        connection.aprobar_prestamo(request.form['id_ejemplar'],
+                                    request.form['codigo_usuario'])
+        flash('Préstamo aprobado.', 'ok')
+    except ValueError as e:
+        flash(str(e), 'error')
+    except Exception:
+        app.logger.exception('Error aprobando préstamo')
+        flash('No fue posible aprobar el préstamo.', 'error')
+    return redirect(url_for('panel_admin'))
+
+
+@app.route('/panel-admin/devolver', methods=['POST'])
+def devolver():
+    _exigir_staff()
+    try:
+        r = connection.registrar_devolucion(request.form['id_ejemplar'],
+                                            request.form.get('observaciones', '').strip())
+        if r['multa'] > 0:
+            flash(f"Devolución registrada con {r['dias_retraso']} día(s) de retraso. "
+                  f"Multa: ${r['multa']:,.0f} (usuario {r['codigo_usuario']}).", 'warn')
+        else:
+            flash('Devolución registrada sin multa.', 'ok')
+    except ValueError as e:
+        flash(str(e), 'error')
+    except Exception:
+        app.logger.exception('Error registrando devolución')
+        flash('No fue posible registrar la devolución.', 'error')
+    return redirect(url_for('panel_admin'))
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

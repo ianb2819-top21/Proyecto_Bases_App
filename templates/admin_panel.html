@@ -1,0 +1,94 @@
+<!-- 1. HERENCIA: usamos el molde base.html -->
+{% extends 'base.html' %}
+
+<!-- 2. RELLENO: todo lo de aquí va en el "hueco" de base.html -->
+{% block content %}
+
+<style>
+  .admin-wrap { max-width: 1000px; margin: 0 auto; padding: 1rem; }
+  .admin-wrap h2 { margin: 2rem 0 .75rem; }
+  .admin-wrap table { width: 100%; border-collapse: collapse; }
+  .admin-wrap th, .admin-wrap td { padding: .6rem .75rem; border-bottom: 1px solid #ddd; text-align: left; }
+  .admin-wrap th { background: #f4f4f4; }
+  .admin-wrap form { margin: 0; display: flex; gap: .5rem; align-items: center; }
+  .btn { border: 0; border-radius: 6px; padding: .4rem .9rem; color: #fff; cursor: pointer; font-weight: 600; }
+  .btn-aprobar { background: #16a34a; }
+  .btn-devolver { background: #d97706; }
+  .badge { padding: .15rem .6rem; border-radius: 999px; font-size: .8rem; background: #e5e7eb; }
+  .badge.prestado { background: #fde68a; }
+  .badge.disponible { background: #bbf7d0; }
+  .flash { padding: .7rem 1rem; border-radius: 6px; margin-bottom: .5rem; }
+  .flash.ok { background: #dcfce7; } .flash.error { background: #fee2e2; } .flash.warn { background: #fef3c7; }
+  .vacio { color: #666; font-style: italic; padding: 1rem 0; }
+</style>
+
+<div class="admin-wrap">
+  <h1>Panel de administración</h1>
+
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% for categoria, texto in mensajes %}
+      <div class="flash {{ categoria }}">{{ texto }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- TABLA 1: PRÉSTAMOS PENDIENTES -->
+  <h2>Préstamos pendientes</h2>
+  {% if pendientes %}
+  <table>
+    <thead>
+      <tr><th>Usuario</th><th>Libro</th><th>Ejemplar</th><th>Solicitado</th><th>Acción</th></tr>
+    </thead>
+    <tbody>
+      {% for p in pendientes %}
+      <tr>
+        <td>{{ p.usuario or p.codigo_usuario }} <small>({{ p.codigo_usuario }})</small></td>
+        <td>{{ p.titulo }}</td>
+        <td>#{{ p.id_ejemplar }}</td>
+        <td>{{ p.fec_prestamo }}</td>
+        <td>
+          <form method="post" action="{{ url_for('aprobar') }}">
+            <input type="hidden" name="id_ejemplar" value="{{ p.id_ejemplar }}">
+            <input type="hidden" name="codigo_usuario" value="{{ p.codigo_usuario }}">
+            <button type="submit" class="btn btn-aprobar">Aprobar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="vacio">No hay solicitudes pendientes.</p>
+  {% endif %}
+
+  <!-- TABLA 2: INVENTARIO TOTAL -->
+  <h2>Inventario total</h2>
+  {% if inventario %}
+  <table>
+    <thead>
+      <tr><th>Ejemplar</th><th>Libro</th><th>ISBN</th><th>Estado</th><th>Acción</th></tr>
+    </thead>
+    <tbody>
+      {% for e in inventario %}
+      <tr>
+        <td>#{{ e.id_ejemplar }}</td>
+        <td>{{ e.titulo }}</td>
+        <td>{{ e.isbn }}</td>
+        <td><span class="badge {{ e.estado|lower }}">{{ e.estado|capitalize }}</span></td>
+        <td>
+          {% if e.estado|lower == 'prestado' %}
+          <form method="post" action="{{ url_for('devolver') }}">
+            <input type="hidden" name="id_ejemplar" value="{{ e.id_ejemplar }}">
+            <input type="text" name="observaciones" placeholder="Observaciones (opcional)">
+            <button type="submit" class="btn btn-devolver">Registrar Devolución</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="vacio">No hay ejemplares registrados.</p>
+  {% endif %}
+</div>
+{% endblock %}
