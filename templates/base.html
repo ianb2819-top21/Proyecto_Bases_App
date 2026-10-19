@@ -45,8 +45,8 @@
             <!-- BIBLIOTECARIO Y ADMINISTRADOR -->
             {% if session.get('rol') in ['bibliotecario', 'administrador'] %}
 
-                <a href="#" class="nav-especial">
-                    Aprobar / Devolver
+                <a href="{{ url_for('panel_admin') }}" class="nav-especial">
+                Aprobar / Devolver
                 </a>
 
                 <a href="#" class="nav-especial">

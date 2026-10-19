@@ -1,8 +1,9 @@
-from flask import Flask, render_template, session, redirect, url_for, abort, request
+from flask import (Flask, render_template, session, redirect, url_for, abort, request, flash)
 import connection # Tu archivo de lógica de negocio
 
 app = Flask(__name__)
 app.secret_key = "clave_secreta_biblioteca_uninorte"
+
 
 @app.route('/')
 def catalogo():
@@ -109,6 +110,87 @@ def login():
 
     return redirect(url_for('catalogo'))
 
+ROLES_STAFF = ('bibliotecario', 'administrador')
+
+def _exigir_staff():
+    if not session.get('codigo') or not session.get('rol'):
+        abort(401)
+
+    if session.get('rol') not in ROLES_STAFF:
+        abort(403)
+
+
+@app.route('/panel-admin')
+def panel_admin():
+    _exigir_staff()
+    try:
+        pendientes = connection.obtener_prestamos_pendientes()
+        inventario = connection.obtener_inventario_admin()
+    except Exception:
+        app.logger.exception('No se pudo cargar el panel de administración')
+        flash('No fue posible cargar los datos del panel.', 'error')
+        pendientes, inventario = [], []
+    return render_template('admin_panel.html', pendientes=pendientes,
+                           inventario=inventario)
+
+
+@app.route('/panel-admin/aprobar', methods=['POST'])
+def aprobar():
+    _exigir_staff()
+
+    try:
+        id_ejemplar = int(request.form['id_ejemplar'])
+        codigo_usuario = request.form['codigo_usuario']
+
+        connection.aprobar_prestamo(
+            id_ejemplar,
+            codigo_usuario
+        )
+
+        flash('Préstamo aprobado correctamente.', 'ok')
+
+    except (ValueError, KeyError) as e:
+        flash(str(e), 'error')
+
+    except Exception:
+        app.logger.exception('Error aprobando préstamo')
+        flash('No fue posible aprobar el préstamo.', 'error')
+
+    return redirect(url_for('panel_admin'))
+
+
+@app.route('/panel-admin/devolver', methods=['POST'])
+def devolver():
+    _exigir_staff()
+
+    try:
+        id_ejemplar = int(request.form['id_ejemplar'])
+        observaciones = request.form.get('observaciones', '').strip()
+
+        r = connection.registrar_devolucion(
+            id_ejemplar,
+            observaciones
+        )
+
+        if r['multa'] > 0:
+            flash(
+                f"Devolución registrada con {r['dias_retraso']} "
+                f"día(s) de retraso. "
+                f"Multa: ${r['multa']:,.0f} "
+                f"(usuario {r['codigo_usuario']}).",
+                'warn'
+            )
+        else:
+            flash('Devolución registrada sin multa.', 'ok')
+
+    except (ValueError, KeyError) as e:
+        flash(str(e), 'error')
+
+    except Exception:
+        app.logger.exception('Error registrando devolución')
+        flash('No fue posible registrar la devolución.', 'error')
+
+    return redirect(url_for('panel_admin'))
 
 @app.route('/logout', methods=['POST'])
 def logout():
