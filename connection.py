@@ -1,7 +1,7 @@
+
 from datetime import datetime
 
 from db import crear_db
-
 '''
 if __name__ == "__main__":
     iniciar_tablas()
