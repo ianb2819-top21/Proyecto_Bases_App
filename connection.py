@@ -487,22 +487,34 @@ def obtener_usuarios_por_codigo(codigo):
             (codigo,)
         )
 
+
 def obtener_catalogo_web():
     from db import crear_db
+
     with crear_db() as db:
         return db.consultar("""
-            SELECT 
-                l.isbn, 
-                l.titulo, 
-                'Ingeniería / Tecnología' AS categoria, 
+            SELECT
+                l.isbn,
+                l.titulo,
+                COALESCE(
+                    GROUP_CONCAT(DISTINCT lc.categoria SEPARATOR ', '),
+                    'Sin categoría'
+                ) AS categoria,
                 e.estado,
-                GROUP_CONCAT(DISTINCT a.nombre SEPARATOR ', ') AS autor,
-                CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen
+                GROUP_CONCAT(
+                    DISTINCT la.autor SEPARATOR ', '
+                ) AS autor,
+                CONCAT(
+                    'https://covers.openlibrary.org/b/isbn/',
+                    l.isbn,
+                    '-L.jpg'
+                ) AS imagen
             FROM libros l
             JOIN ejemplares e ON l.isbn = e.isbn
             LEFT JOIN libro_autor la ON l.isbn = la.isbn
-            LEFT JOIN autores a ON la.id_autor = a.id_autor
+            LEFT JOIN libro_categoria lc ON l.isbn = lc.isbn
             GROUP BY l.isbn, l.titulo, e.estado
         """)
+
         
         
