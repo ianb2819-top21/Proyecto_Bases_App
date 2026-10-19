@@ -1,7 +1,7 @@
+
 from datetime import datetime
 
 from db import crear_db
-
 '''
 if __name__ == "__main__":
     iniciar_tablas()
@@ -488,6 +488,7 @@ def obtener_usuarios_por_codigo(codigo):
         )
 
 
+
 def obtener_catalogo_web():
     from db import crear_db
 
@@ -515,6 +516,7 @@ def obtener_catalogo_web():
             LEFT JOIN libro_categoria lc ON l.isbn = lc.isbn
             GROUP BY l.isbn, l.titulo, e.estado
         """)
+
 
         
         
