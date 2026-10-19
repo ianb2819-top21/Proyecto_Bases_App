@@ -55,8 +55,42 @@ class BaseDatos(ABC):
 
 # 2. MOTOR MYSQL (SIN URLPARSE)
 class MySQLDB(BaseDatos):
-    def __init__(self):
-        # Conexión directa y segura usando variables separadas del .env
+    def __init__(self, url):
+        import pymysql
+        from pymysql.cursors import DictCursor
+        
+        if isinstance(url, bytes):
+            url = url.decode("utf-8")
+
+        u = urlparse(url)
+        nombre_bd = u.path.lstrip("/")
+    
+        # 1. CONEXIÓN TEMPORAL: Solo para ver si la BD existe y crearla
+        conn_temp = pymysql.connect(
+            host=u.hostname,
+            port=u.port or 3306,
+            user=u.username,
+            password=u.password,
+            charset="utf8mb4",
+            autocommit=True,
+        )
+        try:
+            with conn_temp.cursor() as cur:
+                cur.execute("SHOW DATABASES LIKE %s", (nombre_bd,))
+                if not cur.fetchone():
+                    # Si no existe, ejecuta el archivo SQL
+                    try:
+                        script = SCHEMA_PATH.read_text(encoding="utf-8")
+                        for sentencia in _sentencias(script):
+                            cur.execute(sentencia)
+                    except Exception:
+                        cur.execute(f"DROP DATABASE IF EXISTS `{nombre_bd}`") 
+                        raise
+        finally:
+            conn_temp.close() # Cerramos el instalador
+            
+        # 2. CONEXIÓN PERMANENTE: Esta es la que usará tu aplicación viva
+        # CRÍTICO: Aquí usamos 'self.conn' y agregamos el 'DictCursor'
         self.conn = pymysql.connect(
             host=os.getenv("DB_HOST"),
             port=3306,
@@ -90,8 +124,25 @@ class MySQLDB(BaseDatos):
 
     def cerrar(self):
         self.conn.close()
+        
+def crear_db(url=None):
+    import traceback
 
-# 3. PUENTE DE CONEXIÓN
-def crear_db():
-    load_dotenv()
-    return MySQLDB()
+    try:
+        load_dotenv()
+        url = url or os.getenv("DATABASE_URL")
+
+        if not url:
+            raise ValueError("No se encontró DATABASE_URL en el archivo .env")
+
+        print("Intentando conectar con MySQL...")
+
+        db = MySQLDB(url)
+
+        print("Conexión con MySQL exitosa")
+        return db
+
+    except Exception as e:
+        print(f"ERROR AL CONECTAR CON MYSQL: {e}")
+        traceback.print_exc()
+        raise
