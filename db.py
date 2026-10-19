@@ -1,10 +1,9 @@
 import os
+import traceback
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from urllib.parse import urlparse
-
 from dotenv import load_dotenv
-
 
 # 1. INTERFAZ COMÚN
 class BaseDatos(ABC):
@@ -54,58 +53,33 @@ class BaseDatos(ABC):
 
     def __exit__(self, *args):
         self.cerrar()
-        
-      
+
 class MySQLDB(BaseDatos):
     def __init__(self, url):
         import pymysql
         from pymysql.cursors import DictCursor
         
+        # Limpieza de la URL en caso de que venga con formato de bytes
         if isinstance(url, bytes):
             url = url.decode("utf-8")
 
         u = urlparse(url)
         nombre_bd = u.path.lstrip("/")
     
-        # 1. CONEXIÓN TEMPORAL: Solo para ver si la BD existe y crearla
-        conn_temp = pymysql.connect(
-            host=u.hostname,
-            port=u.port or 3306,
-            user=u.username,
-            password=u.password,
-            charset="utf8mb4",
-            autocommit=True,
-        )
-        try:
-            with conn_temp.cursor() as cur:
-                cur.execute("SHOW DATABASES LIKE %s", (nombre_bd,))
-                if not cur.fetchone():
-                    # Si no existe, ejecuta el archivo SQL
-                    try:
-                        script = SCHEMA_PATH.read_text(encoding="utf-8")
-                        for sentencia in _sentencias(script):
-                            cur.execute(sentencia)
-                    except Exception:
-                        cur.execute(f"DROP DATABASE IF EXISTS `{nombre_bd}`") 
-                        raise
-        finally:
-            conn_temp.close() # Cerramos el instalador
-            
-        # 2. CONEXIÓN PERMANENTE: Esta es la que usará tu aplicación viva
-        # CRÍTICO: Aquí usamos 'self.conn' y agregamos el 'DictCursor'
+        # CONEXIÓN PERMANENTE BLINDADA (Sin instalador temporal y con SSL)
         self.conn = pymysql.connect(
             host=u.hostname,
             port=u.port or 3306,
             user=u.username,
             password=u.password,
-            database=nombre_bd,      # Seleccionamos la base de datos
+            database=nombre_bd,
             charset="utf8mb4",
-            cursorclass=DictCursor   # Obliga a MySQL a devolver diccionarios
+            cursorclass=DictCursor,
+            ssl={} # <- EL ESCUDO CONTRA EL BUG DE BYTES
         )
 
     def consultar(self, sql, params=()):
         with self.conn.cursor() as cur:
-            # Aquí funciona el traductor mágico de tu compañero
             cur.execute(sql.replace("?", "%s"), params)
             filas = list(cur.fetchall())
         self._confirmar()
@@ -128,8 +102,6 @@ class MySQLDB(BaseDatos):
         self.conn.close()
         
 def crear_db(url=None):
-    import traceback
-
     try:
         load_dotenv()
         url = url or os.getenv("DATABASE_URL")
@@ -137,10 +109,8 @@ def crear_db(url=None):
         if not url:
             raise ValueError("No se encontró DATABASE_URL en el archivo .env")
 
-        print("Intentando conectar con MySQL...")
-
+        print("Intentando conectar con MySQL en la nube...")
         db = MySQLDB(url)
-
         print("Conexión con MySQL exitosa")
         return db
 
