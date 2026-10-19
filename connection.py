@@ -307,17 +307,19 @@ def obtener_prestamos_rechazados():
 '''Seguridad y autenticación
 La aplicación debe implementar un sistema de autenticación para los usuarios, asegurando que solo los usuarios registrados puedan acceder a las funcionalidades de la aplicación. Se debe utilizar un mecanismo de inicio de sesión con credenciales (usuario y contraseña) y, opcionalmente, se puede implementar autenticación basada en tokens para mayor seguridad.'''
 
-def autenticar_usuario(codigo, correo):
+def autenticar_usuario(codigo, identificacion):
     with crear_db() as db:
-        usuario = db.consultar(
-            # ¡Cambio vital: Ahora SQL busca la columna 'correo' real!
-            "SELECT * FROM usuarios WHERE codigo = ? AND correo = ?",
-            (codigo, correo)
+        usuarios = db.consultar(
+            """
+            SELECT codigo, identificacion, nombres,
+                   correo, estado, rol
+            FROM usuarios
+            WHERE codigo = ? AND identificacion = ?
+            """,
+            (codigo, identificacion)
         )
-        if usuario:
-            return usuario[0]  # Retornamos el diccionario con los datos del usuario
-        else:
-            return None  # Autenticación fallida
+
+        return usuarios[0] if usuarios else None
             
 def bloquear_usuario(codigo):
     with crear_db() as db:
@@ -515,6 +517,21 @@ def obtener_catalogo_web():
             LEFT JOIN libro_categoria lc ON l.isbn = lc.isbn
             GROUP BY l.isbn, l.titulo, e.estado
         """)
+
+def buscar_usuario_por_codigo(codigo):
+    """Busca un usuario por su código institucional."""
+    from db import crear_db
+
+    with crear_db() as db:
+        usuarios = db.consultar("""
+            SELECT codigo, identificacion, nombres,
+                   correo, carrera, estado, rol
+            FROM usuarios
+            WHERE codigo = ?
+            LIMIT 1
+        """, (codigo,))
+
+    return usuarios[0] if usuarios else None
 
         
         

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, redirect, url_for, abort
+from flask import Flask, render_template, session, redirect, url_for, abort, request
 import connection # Tu archivo de lógica de negocio
 
 app = Flask(__name__)
@@ -6,17 +6,12 @@ app.secret_key = "clave_secreta_biblioteca_uninorte"
 
 @app.route('/')
 def catalogo():
-    # Simulador de rol
-    if 'rol' not in session:
-        session['rol'] = 'estudiante'
-        session['nombre'] = 'Usuario de Prueba'
-        # Solo para la demostración: el SQL incluye al estudiante U001.
-        # Reemplazar por el código asignado durante el login real.
-        session['codigo'] = 'U001'
+    if not session.get('codigo') or not session.get('rol'):
+        session.clear()
+        return redirect(url_for('login'))
+        
 
-    # 🌟 AHORA SÍ: LLAMAMOS A MYSQL
     try:
-        # Traemos los libros reales (Clean Code, Effective Java, etc.)
         libros_reales = connection.obtener_catalogo_web()
     except Exception as e:
         import traceback
@@ -32,15 +27,13 @@ def mis_prestamos():
     if session.get('rol') not in ('estudiante', 'docente'):
         abort(403)
 
-    codigo = session.get('codigo') or 'U001'
+    codigo = session.get('codigo')
+
     if not codigo:
-        return redirect(url_for('catalogo'))
+        return redirect(url_for('login'))
 
     try:
         prestamos = connection.consultar_historial_prestamos_por_usuario(codigo)
-
-        print("Archivo utilizado:", connection.__file__)
-        print("Campos devueltos:", [list(p.keys()) for p in prestamos])
     except Exception:
         app.logger.exception('No se pudieron consultar los préstamos')
         return render_template('mis_prestamos.html', prestamos=[], resumen=None,
@@ -60,13 +53,67 @@ def mis_prestamos():
     return render_template('mis_prestamos.html', prestamos=prestamos, resumen=resumen,
                            error=None)
 
-@app.route('/cambiar-rol/<nuevo_rol>')
-def cambiar_rol(nuevo_rol):
-    Roles_validos = ['estudiante', 'docente', 'bibliotecario', 'administrador']
-    if nuevo_rol in Roles_validos:
-        session['rol'] = nuevo_rol
-        session['nombre'] = f"Modo: {nuevo_rol.capitalize()}"
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'GET':
+        return render_template('login.html', error=None)
+
+    codigo = request.form.get('codigo', '').strip()
+    identificacion = request.form.get('identificacion', '').strip()
+
+    try:
+        usuario = connection.autenticar_usuario(codigo, identificacion)
+    except Exception:
+        app.logger.exception('Error consultando usuario')
+        return render_template(
+            'login.html',
+            error='No fue posible iniciar sesión.'
+        ), 503
+
+    # Verificar credenciales
+    if not usuario:
+        return render_template(
+            'login.html',
+            error='Credenciales incorrectas.'
+        ), 401
+
+    # Verificar estado del usuario
+    if (usuario.get('estado') or '').strip().lower() != 'activo':
+        return render_template(
+            'login.html',
+            error='Tu cuenta no está activa.'
+        ), 403
+
+    # Verificar rol
+    roles = {
+        'estudiante',
+        'docente',
+        'bibliotecario',
+        'administrador'
+    }
+
+    rol = (usuario.get('rol') or '').strip().lower()
+
+    if rol not in roles:
+        return render_template(
+            'login.html',
+            error='El usuario no tiene un rol válido.'
+        ), 403
+
+    # Crear sesión
+    session.clear()
+    session['codigo'] = usuario['codigo']
+    session['nombre'] = usuario['nombres']
+    session['rol'] = rol
+
     return redirect(url_for('catalogo'))
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
