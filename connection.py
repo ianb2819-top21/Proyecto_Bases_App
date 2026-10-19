@@ -26,12 +26,78 @@ def registrar_usuario(codigo, identificacion, nombres, correo, rol, carrera=None
         )
 
 def consultar_historial_prestamos_por_usuario(codigo):
+    """Préstamos del usuario con título y estado derivado de las fechas reales.
+
+    El SQL define fec_prestamo, fec_vencimiento, fec_devolucion y sancion.
+    No inventamos una tarifa de multas: se expone solo la sanción guardada.
+    """
+    from datetime import date, datetime
+    from decimal import Decimal
+
     with crear_db() as db:
-        return db.consultar(
-            "SELECT * FROM prestamos WHERE codigo_usuario = ? ORDER BY fecha_prestamo DESC",
-            (codigo,)
+        filas = db.consultar("""
+            SELECT p.id_ejemplar, p.codigo_usuario, p.fec_prestamo,
+                   p.fec_vencimiento, p.fec_devolucion, p.observaciones,
+                   p.estado, p.sancion, l.isbn, l.titulo, l.editorial
+            FROM prestamos AS p
+            JOIN ejemplares AS e ON e.id_ejemplar = p.id_ejemplar
+            JOIN libros AS l ON l.isbn = e.isbn
+            WHERE p.codigo_usuario = ?
+            ORDER BY p.fec_prestamo DESC, p.id_ejemplar DESC
+        """, (codigo,))
+
+    hoy = date.today()
+    TARIFA_MULTA_DIARIA = 2000  
+    for prestamo in filas:
+        vence = prestamo['fec_vencimiento']
+        if isinstance(vence, datetime):
+            vence = vence.date()
+        elif isinstance(vence, str):
+            vence = date.fromisoformat(vence)
+        devuelto = prestamo['fec_devolucion'] is not None
+        dias_restantes = (vence - hoy).days if vence else None
+        if devuelto:
+            estado_visual = 'Devuelto'
+        elif dias_restantes is not None and dias_restantes < 0:
+            estado_visual = 'Vencido'
+        elif dias_restantes is not None and dias_restantes <= 3:
+            estado_visual = 'Próximo a vencer'
+        else:
+            estado_visual = 'Activo'
+
+        prestamo['estado_visual'] = estado_visual
+        
+        # Calculamos el retraso usando la fecha de devolución
+        # o la fecha actual si todavía no ha sido devuelto.
+        fecha_devolucion = prestamo['fec_devolucion']
+
+        if isinstance(fecha_devolucion, datetime):
+            fecha_devolucion = fecha_devolucion.date()
+        elif isinstance(fecha_devolucion, str):
+            fecha_devolucion = date.fromisoformat(fecha_devolucion)
+
+        fecha_referencia = fecha_devolucion or hoy
+
+        dias_retraso = (
+            max((fecha_referencia - vence).days, 0)
+            if vence else 0
         )
-    
+
+        prestamo['dias_retraso'] = dias_retraso
+        prestamo['dias_restantes'] = dias_restantes if not devuelto else None
+        prestamo['multa_calculada'] = dias_retraso * 2000
+
+        # Calculamos la multa según la política de la biblioteca.
+        prestamo['multa_calculada'] = (
+            Decimal(dias_retraso) * Decimal(TARIFA_MULTA_DIARIA)
+        )
+
+        # Conservamos la sanción registrada originalmente en MySQL.
+        prestamo['sancion'] = Decimal(str(prestamo['sancion'] or 0))
+
+    return filas
+
+
 ''' 4.	Gestión de Devolución
 La aplicación debe permitir:
 •	Registrar la devolución de un ejemplar y actualizar su estado a disponible.
@@ -422,19 +488,21 @@ def obtener_usuarios_por_codigo(codigo):
         )
 
 def obtener_catalogo_web():
-    from db import crear_db # Aseguramos la importación
+    from db import crear_db
     with crear_db() as db:
-        # Usamos JOIN para unir la información del libro con la disponibilidad de su ejemplar
         return db.consultar("""
             SELECT 
                 l.isbn, 
                 l.titulo, 
                 'Ingeniería / Tecnología' AS categoria, 
                 e.estado,
+                GROUP_CONCAT(DISTINCT a.nombre SEPARATOR ', ') AS autor,
                 CONCAT('https://covers.openlibrary.org/b/isbn/', l.isbn, '-L.jpg') AS imagen
             FROM libros l
             JOIN ejemplares e ON l.isbn = e.isbn
-            GROUP BY l.isbn, e.estado
+            LEFT JOIN libro_autor la ON l.isbn = la.isbn
+            LEFT JOIN autores a ON la.id_autor = a.id_autor
+            GROUP BY l.isbn, l.titulo, e.estado
         """)
         
         

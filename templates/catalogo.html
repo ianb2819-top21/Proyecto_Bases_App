@@ -26,7 +26,7 @@
         <!-- Contenedor de la carátula y la etiqueta de estado -->
         <div class="portada-contenedor">
             <img src="{{ libro.imagen }}" alt="Portada de {{ libro.titulo }}">
-            <span class="badge {{ libro.estado }}">{{ libro.estado | capitalize }}</span>
+            <span class="badge {{ libro.estado | lower }}">{{ libro.estado | capitalize }}</span>
         </div>
 
         <!-- Información del libro -->
@@ -41,7 +41,7 @@
                 
                 <!-- Vista para ESTUDIANTES y DOCENTES -->
                 {% if session.get('rol') in ['estudiante', 'docente'] %}
-                    {% if libro.estado == 'disponible' %}
+                    {% if libro.estado | lower == 'disponible' %}
                         <button class="btn-solicitar">Solicitar Préstamo</button>
                     {% else %}
                         <button class="btn-deshabilitado" disabled>No disponible</button>

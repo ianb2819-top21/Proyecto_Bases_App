@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <div class="hero-texto">
+    <h1>Mis Préstamos</h1>
+    <p>Consulta tus libros, fechas de devolución y sanciones registradas.</p>
+  </div>
+</section>
+{% if error %}
+  <div class="aviso-error" role="alert">{{ error }}</div>
+{% else %}
+  <section class="resumen-prestamos" aria-label="Resumen de préstamos">
+    <div class="dato-resumen"><span>Sin devolver</span><strong>{{ resumen.activos }}</strong></div>
+    <div class="dato-resumen"><span>Vencidos</span><strong>{{ resumen.vencidos }}</strong></div>
+    <div class="dato-resumen"><span>Multas calculadas</span><strong>${{ '{:,.0f}'.format(resumen.multa_total).replace(',', '.') }} COP</strong></div>
+  </section>
+  {% if prestamos %}
+  <div class="lista-prestamos">
+    {% for prestamo in prestamos %}
+    <article class="prestamo-card">
+      <div class="prestamo-cabecera">
+        <div><h2>{{ prestamo.titulo }}</h2><p class="isbn">ISBN: {{ prestamo.isbn }} · Ejemplar #{{ prestamo.id_ejemplar }}</p></div>
+        <span class="estado-prestamo estado-{{ {'Activo':'activo', 'Próximo a vencer':'proximo', 'Vencido':'vencido', 'Devuelto':'devuelto'}[prestamo.estado_visual] }}">{{ prestamo.estado_visual }}</span>
+      </div>
+      <div class="prestamo-detalles">
+        <div><span>Prestado</span><strong>{{ prestamo.fec_prestamo.strftime('%d/%m/%Y') if prestamo.fec_prestamo else 'Sin fecha' }}</strong></div>
+        <div><span>Vence</span><strong>{{ prestamo.fec_vencimiento.strftime('%d/%m/%Y') if prestamo.fec_vencimiento else 'Sin fecha' }}</strong></div>
+        <div><span>Devuelto</span><strong>{{ prestamo.fec_devolucion.strftime('%d/%m/%Y') if prestamo.fec_devolucion else 'Pendiente' }}</strong></div>
+        <div>
+    <span>Multa calculada</span>
+    <strong>
+        ${{ '{:,.0f}'.format(prestamo.multa_calculada).replace(',', '.') }} COP
+    </strong>
+</div>
+      </div>
+      {% if prestamo.estado_visual == 'Vencido' %}
+        <p class="nota-prestamo alerta">Este libro lleva {{ prestamo.dias_retraso }} día(s) de retraso. Multa acumulada: ${{ '{:,.0f}'.format(prestamo.multa_calculada).replace(',', '.') }} COP.</p>
+      {% elif prestamo.estado_visual == 'Próximo a vencer' %}
+        <p class="nota-prestamo advertencia">¡Atención! Faltan {{ prestamo.dias_restantes }} día(s) para la devolución.</p>
+      {% endif %}
+      {% if prestamo.observaciones %}<p class="nota-prestamo">Observaciones: {{ prestamo.observaciones }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="sin-prestamos">No tienes préstamos registrados.</div>
+  {% endif %}
+{% endif %}
+{% endblock %}

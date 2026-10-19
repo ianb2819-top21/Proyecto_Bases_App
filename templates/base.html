@@ -34,7 +34,7 @@
 
             <!-- ESTUDIANTES y DOCENTES ven sus propios préstamos -->
             {% if session.get('rol') in ['estudiante', 'docente'] %}
-                <a href="#">Mis Préstamos</a>
+                <a href="{{ url_for('mis_prestamos') }}">Mis Préstamos</a>
             {% endif %}
 
             <!-- BIBLIOTECARIO y ADMIN ven la gestión de préstamos y reportes -->

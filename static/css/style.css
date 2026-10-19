@@ -262,3 +262,21 @@ body {
 
 .btn-editar { background: #475569; color: white; }
 .btn-eliminar { background: #dc2626; color: white; }
+/* Portal del estudiante — módulo de préstamos */
+.resumen-prestamos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin-bottom:2rem}
+.dato-resumen,.prestamo-card,.sin-prestamos,.aviso-error{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.4rem}
+.dato-resumen span,.prestamo-detalles span{display:block;color:#94a3b8;font-size:.85rem;margin-bottom:.55rem}
+.dato-resumen strong{font-size:1.8rem;color:#f8fafc}
+.lista-prestamos{display:grid;gap:1rem}
+.prestamo-cabecera{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.3rem}
+.prestamo-cabecera h2{font-size:1.25rem;margin-bottom:.35rem}
+.prestamo-cabecera .isbn{color:#94a3b8;font-size:.85rem}
+.estado-prestamo{font-size:.75rem;padding:.4rem .7rem;border-radius:20px;font-weight:700;white-space:nowrap}
+.estado-activo{background:#14532d;color:#dcfce7}.estado-proximo{background:#78350f;color:#fef3c7}
+.estado-vencido{background:#7f1d1d;color:#fee2e2}.estado-devuelto{background:#334155;color:#e2e8f0}
+.prestamo-detalles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}
+.prestamo-detalles strong{font-size:.9rem}
+.nota-prestamo{margin-top:1rem;color:#cbd5e1;font-size:.85rem}
+.nota-prestamo.alerta{color:#fca5a5}.nota-prestamo.advertencia{color:#fcd34d}
+.aviso-error{border-color:#dc2626;color:#fecaca}
+@media(max-width:720px){.resumen-prestamos{grid-template-columns:1fr}.prestamo-detalles{grid-template-columns:repeat(2,minmax(0,1fr))}.prestamo-cabecera{flex-direction:column}}
